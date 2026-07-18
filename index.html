@@ -339,10 +339,15 @@ table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-num
 </div></div>
 
 <div class="modal-bg" id="mPhoto"><div class="modal">
-  <div class="mtape"></div><h3>ภาพหลักฐาน</h3>
+  <div class="mtape"></div>
+  <div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">ภาพหลักฐาน</h3><span class="hint" id="pvCnt" style="margin:0"></span></div>
   <img id="pvImg" style="width:100%;border-radius:12px;margin:8px 0">
+  <div class="row2" style="margin-bottom:8px">
+    <button class="btn btn-ghost" id="pvPrev" onclick="pvNav(-1)">◀ ก่อนหน้า</button>
+    <button class="btn btn-ghost" id="pvNext" onclick="pvNav(1)">ถัดไป ▶</button>
+  </div>
   <div class="row2">
-    <a id="pvDl" class="btn btn-ghost" style="text-decoration:none">⬇ บันทึกลงเครื่อง</a>
+    <a id="pvDl" class="btn btn-ghost" style="text-decoration:none;text-align:center">⬇ บันทึกรูปนี้</a>
     <button class="btn btn-navy" onclick="closeModal('mPhoto')">ปิด</button>
   </div>
 </div></div>
@@ -485,11 +490,11 @@ async function saveTx(){
       note:document.getElementById('txNote').value.trim(),
       src:aiSource?'ai':'manual', by:OPERATOR,
       uid:(firebase.auth().currentUser||{}).uid||null,
-      hasPhoto:!!pendingPhoto, lockOverride:overrideLock
+      hasPhoto:pendingPhotos.length>0, photoCount:pendingPhotos.length, lockOverride:overrideLock
     };
     const ref=await db.collection('tx').add(doc);
-    if(pendingPhoto){
-      await db.collection('photos').doc(ref.id).set({data:pendingPhoto,ts:doc.ts,by:OPERATOR});
+    if(pendingPhotos.length){
+      await db.collection('photos').doc(ref.id).set({items:pendingPhotos,ts:doc.ts,by:OPERATOR});
     }
     dropPhoto(); clearQty(); beep(true);
     toast(curDir==='out'?'⬆ บันทึกจ่ายออกแล้ว':'⬇ บันทึกรับคืนแล้ว');
@@ -542,17 +547,26 @@ async function shiftSummary(){
   catch(e){alert(txt);}
 }
 /* ดู/ดาวน์โหลดภาพหลักฐาน */
+let PV={imgs:[],i:0,txId:''};
 async function viewPhoto(txId){
   try{
     const s=await db.collection('photos').doc(txId).get();
     if(!s.exists){toast('📦 ภาพถูกเก็บถาวรโดย Admin แล้ว');return;}
     const d=s.data();
-    document.getElementById('pvImg').src=d.data;
-    document.getElementById('pvDl').href=d.data;
-    document.getElementById('pvDl').download='evidence_'+txId+'.jpg';
-    openModal('mPhoto');
+    PV={imgs:d.items||(d.data?[d.data]:[]),i:0,txId};
+    if(!PV.imgs.length){toast('ไม่มีภาพแนบ');return;}
+    pvShow();openModal('mPhoto');
   }catch(e){toast('⚠ โหลดภาพไม่ได้');}
 }
+function pvShow(){
+  document.getElementById('pvImg').src=PV.imgs[PV.i];
+  document.getElementById('pvDl').href=PV.imgs[PV.i];
+  document.getElementById('pvDl').download='evidence_'+PV.txId+'_'+(PV.i+1)+'.jpg';
+  document.getElementById('pvCnt').textContent='รูป '+(PV.i+1)+' / '+PV.imgs.length;
+  document.getElementById('pvPrev').style.visibility=PV.i>0?'visible':'hidden';
+  document.getElementById('pvNext').style.visibility=PV.i<PV.imgs.length-1?'visible':'hidden';
+}
+function pvNav(d){PV.i=Math.max(0,Math.min(PV.imgs.length-1,PV.i+d));pvShow();}
 const txSummary=i=>Object.entries(i).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ');
 const txTotal=i=>Object.values(i).reduce((a,b)=>a+b,0);
 
@@ -564,7 +578,7 @@ function renderTodayTx(){
   el.innerHTML=list.map(t=>{
     const d=DRIVERS.find(x=>x.id===t.driverId);
     return `<div class="tx"><div class="dir ${t.dir}">${t.dir==='out'?'⬆':'⬇'}</div>
-      <div><div><b>${d?d.name:'?'}</b> ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'🤖':''}${t.hasPhoto&&!t.photoArchived?` <span style="cursor:pointer" onclick="viewPhoto('${t.id}')">📷</span>`:(t.photoArchived?' 📦':'')}${t.lockOverride?' ⚠':''}</div>
+      <div><div><b>${d?d.name:'?'}</b> ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'🤖':''}${t.hasPhoto&&!t.photoArchived?` <span style="cursor:pointer" onclick="viewPhoto('${t.id}')">📷${(t.photoCount||1)>1?'×'+t.photoCount:''}</span>`:(t.photoArchived?' 📦':'')}${t.lockOverride?' ⚠':''}</div>
       <div class="meta">${txSummary(t.items)} · ${new Date(t.ts).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} · ${t.by||''}</div></div>
       <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}${(t.uid===((firebase.auth().currentUser||{}).uid)&&Date.now()-t.ts<300000)?`<br><button class="undo" onclick="undoTx('${t.id}')">↩ ยกเลิก</button>`:''}</div></div>`;
   }).join('');
@@ -731,7 +745,7 @@ function renderDash(){
 }
 
 /* ================= AI COUNT ================= */
-let pendingPhoto=null; // ภาพหลักฐานรอบันทึกคู่กับรายการ
+let pendingPhotos=[]; // ภาพหลักฐานหลายรูปต่อรอบ (สูงสุด 6)
 function shrink(img,maxPx,q){
   const cv=document.createElement('canvas');
   const s=Math.min(1,maxPx/Math.max(img.width,img.height));
@@ -741,23 +755,39 @@ function shrink(img,maxPx,q){
 }
 document.getElementById('camInput').addEventListener('change',async ev=>{
   const file=ev.target.files[0];if(!file)return;
+  if(pendingPhotos.length>=6){toast('ครบ 6 รูปต่อรอบแล้ว — บันทึกรายการนี้ก่อน');ev.target.value='';return;}
   const img=new Image();
   img.onload=async()=>{
-    // เวอร์ชันเก็บหลักฐาน (เล็ก ประหยัดที่)
-    pendingPhoto=shrink(img,720,0.6);
-    const prev=document.getElementById('aiPreview');prev.src=pendingPhoto;prev.style.display='block';
-    document.getElementById('photoBadge').style.display='block';
-    if(AI_ENDPOINT){
-      // เวอร์ชันคมกว่าสำหรับ AI
-      await runAI(shrink(img,1200,0.82).split(',')[1]);
+    pendingPhotos.push(shrink(img,720,0.6));
+    const prev=document.getElementById('aiPreview');
+    prev.src=pendingPhotos[pendingPhotos.length-1];prev.style.display='block';
+    updatePhotoBadge();
+    if(AI_ENDPOINT&&pendingPhotos.length===1){
+      await runAI(shrink(img,1200,0.82).split(',')[1]); // AI นับจากรูปแรกเท่านั้น รูปถัดไปคือหลักฐานเพิ่ม
     }else{
-      toast('📷 แนบภาพหลักฐานแล้ว — กรอกจำนวนแล้วกดบันทึก');
+      beep(true);
+      toast('📷 แนบรูปที่ '+pendingPhotos.length+' แล้ว — ถ่ายพาเลทถัดไปได้เลย');
     }
   };
   img.src=URL.createObjectURL(file);
   ev.target.value='';
 });
-function dropPhoto(){pendingPhoto=null;
+function updatePhotoBadge(){
+  const b=document.getElementById('photoBadge');
+  if(!pendingPhotos.length){b.style.display='none';return;}
+  b.style.display='block';
+  b.innerHTML='📎 แนบแล้ว <b>'+pendingPhotos.length+'/6 รูป</b> — ทุกรูปจะถูกบันทึกคู่กับรายการนี้ '+
+    '<button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="undoLastPhoto()">ลบรูปล่าสุด</button>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="dropPhoto()">ล้างทั้งหมด</button>';
+}
+function undoLastPhoto(){
+  pendingPhotos.pop();
+  const prev=document.getElementById('aiPreview');
+  if(pendingPhotos.length){prev.src=pendingPhotos[pendingPhotos.length-1];}
+  else prev.style.display='none';
+  updatePhotoBadge();
+}
+function dropPhoto(){pendingPhotos=[];
   document.getElementById('aiPreview').style.display='none';
   document.getElementById('photoBadge').style.display='none';}
 async function runAI(b64){
