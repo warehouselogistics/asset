@@ -13,18 +13,19 @@
 <!-- Charts + Excel -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 
 <script>
 /* ==========================================================
    ⚙️ CONFIG — แก้ 2 จุดนี้เท่านั้น (ดูคู่มือติดตั้ง ขั้นที่ 3 และ 6)
    ========================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyAqv4RsFC6kOn-3lN70ywGyGyXrg5S0eKE",
-  authDomain: "rsu-asset-control.firebaseapp.com",
-  projectId: "rsu-asset-control",
-  storageBucket: "rsu-asset-control.firebasestorage.app",
-  messagingSenderId: "897750747099",
-  appId: "1:897750747099:web:6f2c31e9fac047bb4dc9fe"
+  apiKey:            "PASTE_YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId:             "PASTE_YOUR_APP_ID"
 };
 /* URL ของ Cloud Function aiCount — ถ้ายังไม่ deploy ให้ปล่อยว่าง ""
    แอปจะทำงานทุกอย่างได้ปกติ ยกเว้นปุ่มนับด้วย AI */
@@ -33,21 +34,22 @@ const AI_ENDPOINT = "";
 </script>
 
 <style>
+/* DHL Corporate Identity */
 :root{
-  --navy:#0E1F3D; --navy2:#16294E; --ink:#1B2432; --paper:#F5F6F8;
-  --amber:#FFB020; --amber-d:#B87700; --red:#E5484D; --green:#30A46C;
-  --steel:#7A8699; --line:#E1E5EB; --card:#FFFFFF;
+  --navy:#191919; --navy2:#2B2B2B; --ink:#191919; --paper:#F5F3EC;
+  --amber:#FFCC00; --amber-d:#8F7300; --red:#D40511; --green:#007A33;
+  --steel:#767268; --line:#E6E1D4; --card:#FFFFFF;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{font-family:'IBM Plex Sans Thai','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
   background:var(--paper);color:var(--ink);font-size:15px;padding-bottom:76px}
-.tape{height:6px;background:repeating-linear-gradient(-45deg,var(--amber) 0 12px,var(--navy) 12px 24px)}
-header{background:var(--navy);color:#fff;padding:14px 16px 12px;position:sticky;top:0;z-index:50}
-header .site{font-size:11px;letter-spacing:.14em;color:var(--amber);font-weight:600;text-transform:uppercase;display:flex;align-items:center}
-header h1{font-size:19px;font-weight:700;margin-top:2px}
-header .sub{font-size:12px;color:#9FB0CC;margin-top:2px}
-#syncDot{margin-left:auto;font-size:11px;letter-spacing:0;display:flex;align-items:center;gap:5px;color:#9FB0CC;text-transform:none;font-weight:500}
+.tape{height:7px;background:repeating-linear-gradient(-45deg,#D40511 0 14px,#FFCC00 14px 28px)}
+header{background:#FFCC00;color:#191919;padding:14px 16px 12px;position:sticky;top:0;z-index:50}
+header .site{font-size:11px;letter-spacing:.14em;color:#D40511;font-weight:800;text-transform:uppercase;display:flex;align-items:center}
+header h1{font-size:20px;font-weight:800;margin-top:2px;font-style:italic;letter-spacing:.01em}
+header .sub{font-size:12px;color:#7A6A00;margin-top:2px}
+#syncDot{margin-left:auto;font-size:11px;letter-spacing:0;display:flex;align-items:center;gap:5px;color:#7A6A00;text-transform:none;font-weight:600}
 #syncDot .d{width:8px;height:8px;border-radius:50%;background:var(--steel)}
 #syncDot.on .d{background:var(--green)} #syncDot.off .d{background:var(--amber)}
 
@@ -58,13 +60,14 @@ nav button{flex:1;background:none;border:0;color:#8FA0BE;padding:9px 2px 8px;fon
   display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 nav button .ic{font-size:20px;line-height:1}
 nav button.on{color:var(--amber)}
+nav button.on::after{content:'';width:22px;height:3px;background:#D40511;border-radius:99px;margin-top:1px}
 
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 .card h2{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .card h2 .dot{width:8px;height:8px;border-radius:2px;background:var(--amber);display:inline-block}
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .kpi{background:var(--navy);border-radius:12px;padding:12px 14px;color:#fff;position:relative;overflow:hidden}
-.kpi.warn{background:#5C1A1D}
+.kpi.warn{background:#6E0309}
 .kpi .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .l{font-size:11.5px;color:#A9B7D0;margin-top:2px}
 .kpi.warn .l{color:#F0B4B6}
@@ -73,7 +76,7 @@ nav button.on{color:var(--amber)}
 
 .btn{display:block;width:100%;border:0;border-radius:11px;padding:14px;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;text-align:center}
 .btn-amber{background:var(--amber);color:var(--navy)}
-.btn-navy{background:var(--navy);color:#fff}
+.btn-navy{background:#191919;color:#FFCC00}
 .btn-ghost{background:#fff;border:1.5px solid var(--navy);color:var(--navy)}
 .btn-red{background:var(--red);color:#fff}
 .btn-sm{padding:8px 12px;font-size:13px;width:auto;display:inline-block;border-radius:9px}
@@ -88,9 +91,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);border-co
 .qty-cell .n{font-size:12px;font-weight:700;color:var(--navy)}
 .qty-cell input{border:0;padding:2px 0 0;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
 .qty-cell input:focus{outline:none}
-.seg{display:flex;border:1.5px solid var(--navy);border-radius:11px;overflow:hidden;margin-top:4px}
+.seg{display:flex;border:1.5px solid #D40511;border-radius:11px;overflow:hidden;margin-top:4px}
 .seg button{flex:1;border:0;background:#fff;padding:11px;font-family:inherit;font-size:15px;font-weight:700;color:var(--navy);cursor:pointer}
-.seg button.on{background:var(--navy);color:var(--amber)}
+.seg button.on{background:#D40511;color:#fff}
 
 .drv{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer}
 .drv .bal{margin-left:auto;text-align:right}
@@ -100,7 +103,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);border-co
 .drv .nm{font-weight:700}
 .drv .pl{font-size:12px;color:var(--steel)}
 .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:99px}
-.badge.lock{background:#FDE8E8;color:var(--red)}
+.badge.lock{background:#FBE3E4;color:var(--red)}
 .badge.ok{background:#E4F5EC;color:var(--green)}
 .badge.open{background:#FFF4DB;color:var(--amber-d)}
 .badge.closed{background:#EDF0F4;color:var(--steel)}
@@ -124,13 +127,16 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);border-co
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:760px;max-height:88vh;overflow-y:auto;padding:18px 16px 24px}
 .modal h3{font-size:16px;font-weight:700;margin-bottom:6px}
-.mtape{height:5px;border-radius:99px;background:repeating-linear-gradient(-45deg,var(--amber) 0 10px,var(--navy) 10px 20px);margin-bottom:12px}
+.mtape{height:5px;border-radius:99px;background:repeating-linear-gradient(-45deg,#D40511 0 10px,#FFCC00 10px 20px);margin-bottom:12px}
 table.rp{width:100%;border-collapse:collapse;font-size:13px}
 table.rp th{background:var(--navy);color:#fff;padding:7px 8px;text-align:left;font-weight:600}
 table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 20px;border-radius:99px;font-size:14px;font-weight:600;z-index:200;display:none;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .chartbox{height:210px}
 .hint{font-size:12px;color:var(--steel);margin-top:6px;line-height:1.5}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:99px;padding:7px 13px;font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer}
+.chip.on{background:#191919;color:#FFCC00;border-color:#191919}
+.undo{border:0;background:#FBE3E4;color:#D40511;border-radius:8px;padding:4px 9px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;margin-left:6px}
 #gate{position:fixed;inset:0;background:var(--navy);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px}
 #gate .box{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px}
 </style>
@@ -150,7 +156,7 @@ table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-num
 </div>
 
 <header>
-  <div class="site">RSU · Recycling Service Unit
+  <div class="site">DHL Supply Chain · RSU
     <span id="syncDot"><span class="d"></span><span id="syncTxt">เชื่อมต่อ…</span></span>
   </div>
   <h1>Asset Control</h1>
@@ -165,13 +171,19 @@ table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-num
     <div class="ai-status" id="aiStatus"><span class="spin"></span><span id="aiStatusTxt">AI กำลังนับ…</span></div>
     <input type="file" id="camInput" accept="image/*" capture="environment" style="display:none">
     <button class="btn btn-amber" id="aiBtn" onclick="document.getElementById('camInput').click()">📷 ถ่ายภาพพาเลท / ท้ายรถ</button>
-    <div class="hint" id="aiHint">ถ่ายให้เห็น stack เต็มเฟรม แสงพอ — AI นับและแยกขนาดให้ แล้วตรวจทานก่อนบันทึกเสมอ</div>
+    <div class="ai-note" id="photoBadge" style="display:none">📎 ภาพนี้จะถูกแนบเป็นหลักฐานคู่กับรายการที่บันทึก <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="dropPhoto()">เอาภาพออก</button></div>
+    <div class="hint" id="aiHint">ถ่ายให้เห็น stack เต็มเฟรม — ภาพถูกเก็บเป็นหลักฐานคู่รายการเสมอ ถ้าตั้งค่า AI ไว้ ระบบจะนับให้ด้วย</div>
   </div>
 
   <div class="card">
     <h2><span class="dot"></span>บันทึกรายการ</h2>
     <label class="f">คนขับ / ผู้รับผิดชอบ</label>
-    <select id="txDriver"></select>
+    <div id="drvChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
+    <div style="display:flex;gap:8px">
+      <select id="txDriver" style="flex:1"></select>
+      <button class="btn btn-ghost btn-sm" style="white-space:nowrap" onclick="document.getElementById('qrInput').click()">📇 สแกนบัตร</button>
+    </div>
+    <input type="file" id="qrInput" accept="image/*" capture="environment" style="display:none">
     <label class="f">ประเภทรายการ</label>
     <div class="seg" id="dirSeg">
       <button class="on" data-d="out" onclick="setDir('out')">⬆ จ่ายออกจากดีซี</button>
@@ -219,6 +231,11 @@ table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-num
 </div>
 
 <div class="wrap tab-page" id="page-set">
+  <div class="card">
+    <h2><span class="dot"></span>ปิดกะ</h2>
+    <button class="btn btn-amber" onclick="shiftSummary()">📋 สรุปกะวันนี้ → แชร์เข้า LINE</button>
+    <div class="hint">รวมยอดจ่าย/รับ/สุทธิ %ภาพหลักฐาน และรายชื่อคนขับติดล็อก เป็นข้อความพร้อมส่งกลุ่มงานทันที</div>
+  </div>
   <div class="card">
     <h2><span class="dot"></span>ส่งออกข้อมูล</h2>
     <button class="btn btn-navy" onclick="exportXLSX()">⬇ ดาวน์โหลด Excel (สำหรับคีย์เข้า RAMS)</button>
@@ -285,6 +302,15 @@ table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-num
   </div>
 </div></div>
 
+<div class="modal-bg" id="mPhoto"><div class="modal">
+  <div class="mtape"></div><h3>ภาพหลักฐาน</h3>
+  <img id="pvImg" style="width:100%;border-radius:12px;margin:8px 0">
+  <div class="row2">
+    <a id="pvDl" class="btn btn-ghost" style="text-decoration:none">⬇ บันทึกลงเครื่อง</a>
+    <button class="btn btn-navy" onclick="closeModal('mPhoto')">ปิด</button>
+  </div>
+</div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -302,6 +328,32 @@ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); // offline cache
 
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';
   clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
+/* เสียง + สั่นตอบสนอง */
+let AC=null;
+function beep(ok=true){
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);
+    o.frequency.value=ok?880:220;g.gain.value=.12;
+    o.start();o.stop(AC.currentTime+(ok?.12:.3));
+  }catch(e){}
+  if(navigator.vibrate)navigator.vibrate(ok?40:[80,60,80]);
+}
+/* คนขับล่าสุด (ชิปกดเร็ว) */
+function recentDrivers(){
+  const seen=[],out=[];
+  for(const t of TX){if(!seen.includes(t.driverId)){seen.push(t.driverId);
+    const d=DRIVERS.find(x=>x.id===t.driverId);if(d)out.push(d);if(out.length>=3)break;}}
+  return out;
+}
+function renderChips(){
+  const el=document.getElementById('drvChips');if(!el)return;
+  const cur=document.getElementById('txDriver').value;
+  el.innerHTML=recentDrivers().map(d=>
+    `<button class="chip ${d.id===cur?'on':''}" onclick="pickDriver('${d.id}')">${d.name.split(' ')[0]}</button>`).join('');
+}
+function pickDriver(id){document.getElementById('txDriver').value=id;renderChips();beep(true);}
 function setSync(on){const s=document.getElementById('syncDot');
   s.className=on?'on':'off'; s.id='syncDot';
   document.getElementById('syncTxt').textContent=on?'ออนไลน์':'ออฟไลน์ (จะซิงก์เมื่อมีเน็ต)';}
@@ -373,15 +425,89 @@ async function saveTx(){
   if(!drv){toast('เพิ่มคนขับก่อน (แท็บ 🚚)');return;}
   const q=readQty();
   if(q.total===0){toast('ใส่จำนวนอย่างน้อย 1 รายการ');return;}
+  // จ่ายออกให้คนขับที่ติดล็อก: เตือน + ถ้ายืนยันจะติดธงไว้ให้ Admin เห็น
+  let overrideLock=false;
+  if(curDir==='out'){
+    const b=driverBalance(drv);
+    if(b.locked){
+      if(!confirm('🔒 คนขับคนนี้ติดล็อก (ค้าง '+b.net+' หน่วย '+b.aging+' วัน)\nการจ่ายเพิ่มต้องได้รับอนุญาตจากหัวหน้างาน\n\nยืนยันว่าได้รับอนุญาตแล้ว?'))return;
+      overrideLock=true;
+    }
+  }
   try{
-    await db.collection('tx').add({
+    const doc={
       ts:Date.now(), driverId:drv, dir:curDir, items:q.items,
       rq:document.getElementById('txRQ').value.trim(),
       note:document.getElementById('txNote').value.trim(),
-      src:aiSource?'ai':'manual', by:OPERATOR
-    });
-    clearQty(); toast(curDir==='out'?'⬆ บันทึกจ่ายออกแล้ว':'⬇ บันทึกรับคืนแล้ว');
-  }catch(e){toast('⚠ บันทึกไม่สำเร็จ: '+e.message);}
+      src:aiSource?'ai':'manual', by:OPERATOR,
+      uid:(firebase.auth().currentUser||{}).uid||null,
+      hasPhoto:!!pendingPhoto, lockOverride:overrideLock
+    };
+    const ref=await db.collection('tx').add(doc);
+    if(pendingPhoto){
+      await db.collection('photos').doc(ref.id).set({data:pendingPhoto,ts:doc.ts,by:OPERATOR});
+    }
+    dropPhoto(); clearQty(); beep(true);
+    toast(curDir==='out'?'⬆ บันทึกจ่ายออกแล้ว':'⬇ บันทึกรับคืนแล้ว');
+  }catch(e){beep(false);toast('⚠ บันทึกไม่สำเร็จ: '+e.message);}
+}
+/* สแกนบัตรคนขับ (QR = driverId) */
+document.getElementById('qrInput').addEventListener('change',ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  const img=new Image();
+  img.onload=()=>{
+    const cv=document.createElement('canvas');
+    const s=Math.min(1,900/Math.max(img.width,img.height));
+    cv.width=img.width*s;cv.height=img.height*s;
+    const cx=cv.getContext('2d');cx.drawImage(img,0,0,cv.width,cv.height);
+    const id_=cx.getImageData(0,0,cv.width,cv.height);
+    const code=window.jsQR?jsQR(id_.data,cv.width,cv.height):null;
+    if(code&&DRIVERS.find(d=>d.id===code.data)){
+      pickDriver(code.data);
+      toast('✓ '+DRIVERS.find(d=>d.id===code.data).name);
+    }else{beep(false);toast('อ่าน QR ไม่ได้ — ถ่ายให้ชัดเต็มกรอบ');}
+  };
+  img.src=URL.createObjectURL(f);ev.target.value='';
+});
+/* ยกเลิกรายการตัวเอง ภายใน 5 นาที */
+async function undoTx(id){
+  if(!confirm('ยกเลิกรายการนี้? (ทำได้เฉพาะรายการของตัวเองภายใน 5 นาที)'))return;
+  try{
+    await db.collection('tx').doc(id).delete();
+    try{await db.collection('photos').doc(id).delete();}catch(e){}
+    beep(true);toast('↩ ยกเลิกรายการแล้ว');
+  }catch(e){beep(false);toast('⚠ เกิน 5 นาทีหรือไม่ใช่รายการของคุณ');}
+}
+/* สรุปปิดกะ แชร์เข้า LINE/แชท */
+async function shiftSummary(){
+  const d0=new Date();d0.setHours(0,0,0,0);
+  const mine=TX.filter(t=>t.ts>=d0.getTime());
+  let out=0,inn=0,nOut=0,nIn=0,photo=0;
+  mine.forEach(t=>{const v=txTotal(t.items);
+    if(t.dir==='out'){out+=v;nOut++;}else{inn+=v;nIn++;}
+    if(t.hasPhoto)photo++;});
+  const locks=DRIVERS.filter(d=>driverBalance(d.id).locked).map(d=>d.name);
+  const txt=['📋 สรุปกะ RSU · '+new Date().toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})+' · '+OPERATOR,
+    '⬆ จ่ายออก '+nOut+' รายการ '+out+' หน่วย',
+    '⬇ รับคืน '+nIn+' รายการ '+inn+' หน่วย',
+    '📦 สุทธิออกนอกดีซีวันนี้ '+(out-inn)+' หน่วย',
+    '📷 มีภาพหลักฐาน '+(mine.length?Math.round(100*photo/mine.length):0)+'%',
+    locks.length?('🔒 ติดล็อก: '+locks.join(', ')):'✅ ไม่มีคนขับติดล็อก'].join('\n');
+  if(navigator.share){try{await navigator.share({text:txt});return;}catch(e){}}
+  try{await navigator.clipboard.writeText(txt);toast('คัดลอกสรุปกะแล้ว — วางใน LINE ได้เลย');}
+  catch(e){alert(txt);}
+}
+/* ดู/ดาวน์โหลดภาพหลักฐาน */
+async function viewPhoto(txId){
+  try{
+    const s=await db.collection('photos').doc(txId).get();
+    if(!s.exists){toast('📦 ภาพถูกเก็บถาวรโดย Admin แล้ว');return;}
+    const d=s.data();
+    document.getElementById('pvImg').src=d.data;
+    document.getElementById('pvDl').href=d.data;
+    document.getElementById('pvDl').download='evidence_'+txId+'.jpg';
+    openModal('mPhoto');
+  }catch(e){toast('⚠ โหลดภาพไม่ได้');}
 }
 const txSummary=i=>Object.entries(i).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ');
 const txTotal=i=>Object.values(i).reduce((a,b)=>a+b,0);
@@ -394,9 +520,9 @@ function renderTodayTx(){
   el.innerHTML=list.map(t=>{
     const d=DRIVERS.find(x=>x.id===t.driverId);
     return `<div class="tx"><div class="dir ${t.dir}">${t.dir==='out'?'⬆':'⬇'}</div>
-      <div><div><b>${d?d.name:'?'}</b> ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'🤖':''}</div>
+      <div><div><b>${d?d.name:'?'}</b> ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'🤖':''}${t.hasPhoto&&!t.photoArchived?` <span style="cursor:pointer" onclick="viewPhoto('${t.id}')">📷</span>`:(t.photoArchived?' 📦':'')}${t.lockOverride?' ⚠':''}</div>
       <div class="meta">${txSummary(t.items)} · ${new Date(t.ts).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} · ${t.by||''}</div></div>
-      <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}</div></div>`;
+      <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}${(t.uid===((firebase.auth().currentUser||{}).uid)&&Date.now()-t.ts<300000)?`<br><button class="undo" onclick="undoTx('${t.id}')">↩ ยกเลิก</button>`:''}</div></div>`;
   }).join('');
 }
 
@@ -458,13 +584,13 @@ function openDrvDetail(id){
   document.getElementById('ddName').textContent=d.name;
   document.getElementById('ddMeta').textContent=(d.plate||'')+(d.co?' · '+d.co:'');
   document.getElementById('ddBal').innerHTML=
-    `<div class="kpi" style="background:${b.net>0?'#5C1A1D':'var(--navy)'}"><div class="edge" style="background:${b.net>0?'var(--red)':'var(--green)'}"></div>
+    `<div class="kpi" style="background:${b.net>0?'#6E0309':'var(--navy)'}"><div class="edge" style="background:${b.net>0?'var(--red)':'var(--green)'}"></div>
      <div class="v">${b.net}</div><div class="l">ยอดค้างรวม ${b.net>0?'· ค้างมา '+b.aging+' วัน'+(b.locked?' · 🔒 เกินกำหนด — ระงับจ่ายเพิ่ม':''):''}</div></div>`
     +(b.net>0?`<div class="hint">แยกชนิด: ${Object.entries(b.bal).filter(([,v])=>v>0).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ')}</div>`:'');
   const list=TX.filter(t=>t.driverId===id);
   document.getElementById('ddTx').innerHTML=list.length?list.map(t=>`
     <div class="tx"><div class="dir ${t.dir}">${t.dir==='out'?'⬆':'⬇'}</div>
-    <div><div>${t.rq||'(ไม่มี RQ)'} ${t.src==='ai'?'🤖':''}</div>
+    <div><div>${t.rq||'(ไม่มี RQ)'} ${t.src==='ai'?'🤖':''}${t.hasPhoto&&!t.photoArchived?` <span style="cursor:pointer" onclick="viewPhoto('${t.id}')">📷</span>`:(t.photoArchived?' 📦':'')}${t.lockOverride?' ⚠':''}</div>
     <div class="meta">${txSummary(t.items)} · ${new Date(t.ts).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${t.by||''}</div></div>
     <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}</div></div>`).join(''):
     '<div class="empty">ยังไม่มีรายการ</div>';
@@ -561,22 +687,35 @@ function renderDash(){
 }
 
 /* ================= AI COUNT ================= */
+let pendingPhoto=null; // ภาพหลักฐานรอบันทึกคู่กับรายการ
+function shrink(img,maxPx,q){
+  const cv=document.createElement('canvas');
+  const s=Math.min(1,maxPx/Math.max(img.width,img.height));
+  cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);
+  cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+  return cv.toDataURL('image/jpeg',q);
+}
 document.getElementById('camInput').addEventListener('change',async ev=>{
   const file=ev.target.files[0];if(!file)return;
-  if(!AI_ENDPOINT){toast('ยังไม่ได้ตั้งค่า AI_ENDPOINT — กรอกตัวเลขเองได้เลย');ev.target.value='';return;}
   const img=new Image();
   img.onload=async()=>{
-    const cv=document.createElement('canvas');
-    const scale=Math.min(1,1200/Math.max(img.width,img.height));
-    cv.width=Math.round(img.width*scale);cv.height=Math.round(img.height*scale);
-    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-    const dataUrl=cv.toDataURL('image/jpeg',0.82);
-    const prev=document.getElementById('aiPreview');prev.src=dataUrl;prev.style.display='block';
-    await runAI(dataUrl.split(',')[1]);
+    // เวอร์ชันเก็บหลักฐาน (เล็ก ประหยัดที่)
+    pendingPhoto=shrink(img,720,0.6);
+    const prev=document.getElementById('aiPreview');prev.src=pendingPhoto;prev.style.display='block';
+    document.getElementById('photoBadge').style.display='block';
+    if(AI_ENDPOINT){
+      // เวอร์ชันคมกว่าสำหรับ AI
+      await runAI(shrink(img,1200,0.82).split(',')[1]);
+    }else{
+      toast('📷 แนบภาพหลักฐานแล้ว — กรอกจำนวนแล้วกดบันทึก');
+    }
   };
   img.src=URL.createObjectURL(file);
   ev.target.value='';
 });
+function dropPhoto(){pendingPhoto=null;
+  document.getElementById('aiPreview').style.display='none';
+  document.getElementById('photoBadge').style.display='none';}
 async function runAI(b64){
   const st=document.getElementById('aiStatus');
   st.style.display='block';
@@ -635,7 +774,7 @@ function renderSettings(){
   document.getElementById('dataInfo').textContent=
     `คนขับ ${DRIVERS.length} คน · รายการ ${TX.length} รายการ · เคส ${INC.length} เคส · AI: ${AI_ENDPOINT?'พร้อมใช้':'ยังไม่ตั้งค่า'} — ข้อมูลซิงก์ทุกเครื่องแบบเรียลไทม์ และใช้ออฟไลน์ได้ (ซิงก์เมื่อมีเน็ต)`;
 }
-function renderAll(){renderDrivers();renderTodayTx();renderSettings();
+function renderAll(){renderDrivers();renderTodayTx();renderSettings();renderChips();
   if(document.getElementById('page-dash').classList.contains('active'))renderDash();}
 buildQtyGrid();
 </script>
