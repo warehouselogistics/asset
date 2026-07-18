@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0E1F3D">
+<title>RSU Asset Control · Cloud</title>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Charts + Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+/* ==========================================================
+   ⚙️ CONFIG — แก้ 2 จุดนี้เท่านั้น (ดูคู่มือติดตั้ง ขั้นที่ 3 และ 6)
+   ========================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAqv4RsFC6kOn-3lN70ywGyGyXrg5S0eKE",
+  authDomain: "rsu-asset-control.firebaseapp.com",
+  projectId: "rsu-asset-control",
+  storageBucket: "rsu-asset-control.firebasestorage.app",
+  messagingSenderId: "897750747099",
+  appId: "1:897750747099:web:6f2c31e9fac047bb4dc9fe"
+};
+/* URL ของ Cloud Function aiCount — ถ้ายังไม่ deploy ให้ปล่อยว่าง ""
+   แอปจะทำงานทุกอย่างได้ปกติ ยกเว้นปุ่มนับด้วย AI */
+const AI_ENDPOINT = "";
+/* ========================================================== */
+</script>
+
+<style>
+:root{
+  --navy:#0E1F3D; --navy2:#16294E; --ink:#1B2432; --paper:#F5F6F8;
+  --amber:#FFB020; --amber-d:#B87700; --red:#E5484D; --green:#30A46C;
+  --steel:#7A8699; --line:#E1E5EB; --card:#FFFFFF;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:'IBM Plex Sans Thai','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
+  background:var(--paper);color:var(--ink);font-size:15px;padding-bottom:76px}
+.tape{height:6px;background:repeating-linear-gradient(-45deg,var(--amber) 0 12px,var(--navy) 12px 24px)}
+header{background:var(--navy);color:#fff;padding:14px 16px 12px;position:sticky;top:0;z-index:50}
+header .site{font-size:11px;letter-spacing:.14em;color:var(--amber);font-weight:600;text-transform:uppercase;display:flex;align-items:center}
+header h1{font-size:19px;font-weight:700;margin-top:2px}
+header .sub{font-size:12px;color:#9FB0CC;margin-top:2px}
+#syncDot{margin-left:auto;font-size:11px;letter-spacing:0;display:flex;align-items:center;gap:5px;color:#9FB0CC;text-transform:none;font-weight:500}
+#syncDot .d{width:8px;height:8px;border-radius:50%;background:var(--steel)}
+#syncDot.on .d{background:var(--green)} #syncDot.off .d{background:var(--amber)}
+
+.wrap{padding:14px 14px 20px;max-width:760px;margin:0 auto}
+.tab-page{display:none}.tab-page.active{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--navy);display:flex;z-index:60;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:#8FA0BE;padding:9px 2px 8px;font-family:inherit;font-size:10.5px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button .ic{font-size:20px;line-height:1}
+nav button.on{color:var(--amber)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h2 .dot{width:8px;height:8px;border-radius:2px;background:var(--amber);display:inline-block}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.kpi{background:var(--navy);border-radius:12px;padding:12px 14px;color:#fff;position:relative;overflow:hidden}
+.kpi.warn{background:#5C1A1D}
+.kpi .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .l{font-size:11.5px;color:#A9B7D0;margin-top:2px}
+.kpi.warn .l{color:#F0B4B6}
+.kpi .edge{position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--amber)}
+.kpi.warn .edge{background:var(--red)}
+
+.btn{display:block;width:100%;border:0;border-radius:11px;padding:14px;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;text-align:center}
+.btn-amber{background:var(--amber);color:var(--navy)}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-ghost{background:#fff;border:1.5px solid var(--navy);color:var(--navy)}
+.btn-red{background:var(--red);color:#fff}
+.btn-sm{padding:8px 12px;font-size:13px;width:auto;display:inline-block;border-radius:9px}
+.btn:disabled{opacity:.45}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+label.f{display:block;font-size:12px;font-weight:600;color:var(--steel);margin:10px 0 4px}
+input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-family:inherit;font-size:16px;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);border-color:var(--amber)}
+.qty-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.qty-cell{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+.qty-cell .n{font-size:12px;font-weight:700;color:var(--navy)}
+.qty-cell input{border:0;padding:2px 0 0;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.qty-cell input:focus{outline:none}
+.seg{display:flex;border:1.5px solid var(--navy);border-radius:11px;overflow:hidden;margin-top:4px}
+.seg button{flex:1;border:0;background:#fff;padding:11px;font-family:inherit;font-size:15px;font-weight:700;color:var(--navy);cursor:pointer}
+.seg button.on{background:var(--navy);color:var(--amber)}
+
+.drv{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.drv .bal{margin-left:auto;text-align:right}
+.drv .bal .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.drv .bal .n.pos{color:var(--red)}.drv .bal .n.zero{color:var(--green)}
+.drv .bal .a{font-size:11px;color:var(--steel)}
+.drv .nm{font-weight:700}
+.drv .pl{font-size:12px;color:var(--steel)}
+.badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:99px}
+.badge.lock{background:#FDE8E8;color:var(--red)}
+.badge.ok{background:#E4F5EC;color:var(--green)}
+.badge.open{background:#FFF4DB;color:var(--amber-d)}
+.badge.closed{background:#EDF0F4;color:var(--steel)}
+
+.tx{display:flex;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:13.5px;align-items:flex-start}
+.tx:last-child{border-bottom:0}
+.tx .dir{font-weight:800;font-size:15px;width:26px;text-align:center;flex-shrink:0}
+.tx .dir.out{color:var(--red)}.tx .dir.in{color:var(--green)}
+.tx .meta{color:var(--steel);font-size:11.5px;margin-top:1px}
+.tx .amt{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.empty{text-align:center;color:var(--steel);padding:26px 10px;font-size:13.5px}
+.empty .big{font-size:34px;margin-bottom:6px}
+#aiPreview{width:100%;border-radius:12px;display:none;margin-bottom:10px;max-height:280px;object-fit:cover}
+.ai-status{display:none;background:var(--navy);color:#fff;border-radius:12px;padding:14px;text-align:center;margin-bottom:12px}
+.ai-status .spin{display:inline-block;width:18px;height:18px;border:3px solid #3A4E77;border-top-color:var(--amber);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-4px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ai-note{background:#FFF8E8;border:1px solid #F2DCA6;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#7A5A00;margin-top:10px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(14,31,61,.55);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:760px;max-height:88vh;overflow-y:auto;padding:18px 16px 24px}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.mtape{height:5px;border-radius:99px;background:repeating-linear-gradient(-45deg,var(--amber) 0 10px,var(--navy) 10px 20px);margin-bottom:12px}
+table.rp{width:100%;border-collapse:collapse;font-size:13px}
+table.rp th{background:var(--navy);color:#fff;padding:7px 8px;text-align:left;font-weight:600}
+table.rp td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 20px;border-radius:99px;font-size:14px;font-weight:600;z-index:200;display:none;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.chartbox{height:210px}
+.hint{font-size:12px;color:var(--steel);margin-top:6px;line-height:1.5}
+#gate{position:fixed;inset:0;background:var(--navy);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px}
+#gate .box{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:420px}
+</style>
+</head>
+<body>
+
+<!-- operator gate -->
+<div id="gate">
+  <div class="box">
+    <div class="mtape"></div>
+    <h3 style="font-size:18px;font-weight:700">RSU Asset Control</h3>
+    <div class="hint" id="gateStatus">กำลังเชื่อมต่อระบบ…</div>
+    <label class="f">ชื่อผู้ปฏิบัติงานกะนี้</label>
+    <input id="opName" placeholder="เช่น สมชาย (กะเช้า)">
+    <div style="margin-top:14px"><button class="btn btn-amber" id="gateBtn" onclick="enterApp()" disabled>เข้าใช้งาน</button></div>
+  </div>
+</div>
+
+<header>
+  <div class="site">RSU · Recycling Service Unit
+    <span id="syncDot"><span class="d"></span><span id="syncTxt">เชื่อมต่อ…</span></span>
+  </div>
+  <h1>Asset Control</h1>
+  <div class="sub" id="hdrSub"></div>
+</header>
+<div class="tape"></div>
+
+<div class="wrap tab-page active" id="page-scan">
+  <div class="card">
+    <h2><span class="dot"></span>นับตะกร้าด้วย AI</h2>
+    <img id="aiPreview" alt="ภาพที่ถ่าย">
+    <div class="ai-status" id="aiStatus"><span class="spin"></span><span id="aiStatusTxt">AI กำลังนับ…</span></div>
+    <input type="file" id="camInput" accept="image/*" capture="environment" style="display:none">
+    <button class="btn btn-amber" id="aiBtn" onclick="document.getElementById('camInput').click()">📷 ถ่ายภาพพาเลท / ท้ายรถ</button>
+    <div class="hint" id="aiHint">ถ่ายให้เห็น stack เต็มเฟรม แสงพอ — AI นับและแยกขนาดให้ แล้วตรวจทานก่อนบันทึกเสมอ</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>บันทึกรายการ</h2>
+    <label class="f">คนขับ / ผู้รับผิดชอบ</label>
+    <select id="txDriver"></select>
+    <label class="f">ประเภทรายการ</label>
+    <div class="seg" id="dirSeg">
+      <button class="on" data-d="out" onclick="setDir('out')">⬆ จ่ายออกจากดีซี</button>
+      <button data-d="in" onclick="setDir('in')">⬇ รับคืนเข้าดีซี</button>
+    </div>
+    <label class="f">เลขเอกสาร RQ (ถ้ามี)</label>
+    <input id="txRQ" placeholder="เช่น RQ2607xxxx">
+    <label class="f">จำนวนสินทรัพย์</label>
+    <div class="qty-grid" id="qtyGrid"></div>
+    <label class="f">หมายเหตุ</label>
+    <input id="txNote" placeholder="เช่น สาขา 1234 / เที่ยวเช้า">
+    <div style="margin-top:14px"><button class="btn btn-navy" onclick="saveTx()">บันทึกรายการ</button></div>
+    <div class="ai-note" id="aiSrcNote" style="display:none"></div>
+  </div>
+
+  <div class="card"><h2><span class="dot"></span>รายการล่าสุดวันนี้</h2><div id="todayTx"></div></div>
+</div>
+
+<div class="wrap tab-page" id="page-drivers">
+  <div class="kpis">
+    <div class="kpi"><div class="edge"></div><div class="v" id="kDrv">0</div><div class="l">คนขับในระบบ</div></div>
+    <div class="kpi warn"><div class="edge"></div><div class="v" id="kLock">0</div><div class="l">ติดล็อก (ค้างเกินกำหนด)</div></div>
+  </div>
+  <button class="btn btn-ghost" style="margin-bottom:12px" onclick="openDriverModal()">＋ เพิ่มคนขับ</button>
+  <div id="drvList"></div>
+</div>
+
+<div class="wrap tab-page" id="page-inc">
+  <div class="kpis">
+    <div class="kpi"><div class="edge"></div><div class="v" id="kIncM">0</div><div class="l">เคสเดือนนี้ (เป้า = 0)</div></div>
+    <div class="kpi"><div class="edge"></div><div class="v" id="kIncOpen">0</div><div class="l">ยังไม่ปิดเคส</div></div>
+  </div>
+  <button class="btn btn-ghost" style="margin-bottom:12px" onclick="openIncModal()">＋ เปิดเคสใหม่ (ตั๋วมือ / นอกรายการ)</button>
+  <div id="incList"></div>
+</div>
+
+<div class="wrap tab-page" id="page-dash">
+  <div class="kpis">
+    <div class="kpi"><div class="edge"></div><div class="v" id="kOut">0</div><div class="l">ตะกร้าค้างนอกดีซี (ใบ)</div></div>
+    <div class="kpi"><div class="edge"></div><div class="v" id="kTxToday">0</div><div class="l">รายการวันนี้</div></div>
+  </div>
+  <div class="card"><h2><span class="dot"></span>จ่ายออก vs รับคืน — 7 วันล่าสุด</h2><div class="chartbox"><canvas id="chart7"></canvas></div></div>
+  <div class="card"><h2><span class="dot"></span>ยอดค้างสูงสุด</h2><div id="topDebt"></div></div>
+  <div class="card"><h2><span class="dot"></span>ยอดค้างแยกชนิด</h2><div id="byType"></div></div>
+</div>
+
+<div class="wrap tab-page" id="page-set">
+  <div class="card">
+    <h2><span class="dot"></span>ส่งออกข้อมูล</h2>
+    <button class="btn btn-navy" onclick="exportXLSX()">⬇ ดาวน์โหลด Excel (สำหรับคีย์เข้า RAMS)</button>
+    <div class="hint">3 ชีต: รายการเคลื่อนไหว, ยอดค้างรายคนขับ, เคส Incident</div>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>ตั้งค่า (มีผลทุกเครื่อง)</h2>
+    <label class="f">ค้างเกินกี่วันจึงติดล็อก</label>
+    <input type="number" id="setOverdue" min="1" inputmode="numeric">
+    <div style="margin-top:12px"><button class="btn btn-ghost" onclick="saveSettings()">บันทึกการตั้งค่า</button></div>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>สถานะระบบ</h2>
+    <div class="hint" id="dataInfo"></div>
+  </div>
+</div>
+
+<nav>
+  <button class="on" data-t="scan" onclick="go('scan')"><span class="ic">📷</span>นับ AI</button>
+  <button data-t="drivers" onclick="go('drivers')"><span class="ic">🚚</span>คนขับ</button>
+  <button data-t="inc" onclick="go('inc')"><span class="ic">🚩</span>เคส</button>
+  <button data-t="dash" onclick="go('dash')"><span class="ic">📊</span>สรุป</button>
+  <button data-t="set" onclick="go('set')"><span class="ic">⚙️</span>ตั้งค่า</button>
+</nav>
+
+<div class="modal-bg" id="mDriver"><div class="modal">
+  <div class="mtape"></div><h3>เพิ่มคนขับ</h3>
+  <label class="f">ชื่อ-สกุล</label><input id="dNm" placeholder="เช่น สมชาย ใจดี">
+  <label class="f">ทะเบียนรถ</label><input id="dPl" placeholder="เช่น 83-1234 ฉช">
+  <label class="f">สังกัด / บริษัทขนส่ง</label><input id="dCo" placeholder="เช่น Transport A">
+  <div class="row2" style="margin-top:16px">
+    <button class="btn btn-ghost" onclick="closeModal('mDriver')">ยกเลิก</button>
+    <button class="btn btn-navy" onclick="addDriver()">บันทึก</button>
+  </div>
+</div></div>
+
+<div class="modal-bg" id="mDrvDetail"><div class="modal">
+  <div class="mtape"></div><h3 id="ddName"></h3>
+  <div class="hint" id="ddMeta"></div>
+  <div id="ddBal" style="margin:12px 0"></div>
+  <h3 style="font-size:14px;margin-top:14px">ประวัติรายการ</h3>
+  <div id="ddTx" style="max-height:38vh;overflow-y:auto"></div>
+  <div class="row2" style="margin-top:16px">
+    <button class="btn btn-red btn-sm" onclick="delDriver()">ลบคนขับ</button>
+    <button class="btn btn-navy" onclick="closeModal('mDrvDetail')">ปิด</button>
+  </div>
+</div></div>
+
+<div class="modal-bg" id="mInc"><div class="modal">
+  <div class="mtape"></div><h3>เปิดเคส Incident</h3>
+  <label class="f">ประเภท</label>
+  <select id="iType">
+    <option>ตั๋วมือ (ไม่มีเอกสาร RAMS)</option>
+    <option>นอกรายการ (ของเกินเอกสาร)</option>
+    <option>รับขาดจากเอกสาร</option>
+    <option>อื่น ๆ</option>
+  </select>
+  <label class="f">คนขับ (ถ้าระบุได้)</label><select id="iDriver"></select>
+  <label class="f">สาขา / ต้นทาง</label><input id="iBranch" placeholder="เช่น สาขา 1234">
+  <label class="f">รายละเอียด</label><textarea id="iDetail" rows="3" placeholder="ชนิด/จำนวนสินทรัพย์ และเหตุการณ์"></textarea>
+  <div class="row2" style="margin-top:16px">
+    <button class="btn btn-ghost" onclick="closeModal('mInc')">ยกเลิก</button>
+    <button class="btn btn-navy" onclick="addInc()">เปิดเคส</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= CORE ================= */
+const TYPES=[
+  {c:'A',n:'ตะกร้า A'},{c:'S',n:'ตะกร้า S'},{c:'M',n:'ตะกร้า M'},{c:'SB',n:'ตะกร้า SB'},
+  {c:'PALLET',n:'พาเลท'},{c:'ROLL',n:'Roll cage'},{c:'THERMO',n:'ตู้เทอร์โม'},{c:'PLATE',n:'แผ่นแช่'}
+];
+let DRIVERS=[], TX=[], INC=[], SETTINGS={overdueDays:3};
+let curDir='out', aiSource=false, curDrvId=null, chart7=null, OPERATOR='';
+
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); // offline cache
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
+function setSync(on){const s=document.getElementById('syncDot');
+  s.className=on?'on':'off'; s.id='syncDot';
+  document.getElementById('syncTxt').textContent=on?'ออนไลน์':'ออฟไลน์ (จะซิงก์เมื่อมีเน็ต)';}
+window.addEventListener('online',()=>setSync(true));
+window.addEventListener('offline',()=>setSync(false));
+
+/* auth gate */
+firebase.auth().signInAnonymously().then(()=>{
+  document.getElementById('gateStatus').textContent='เชื่อมต่อสำเร็จ — ใส่ชื่อผู้ปฏิบัติงานเพื่อเริ่ม';
+  document.getElementById('gateBtn').disabled=false;
+  const last=localStorage.getItem('rsu-op'); if(last) document.getElementById('opName').value=last;
+  attachListeners();
+}).catch(e=>{
+  document.getElementById('gateStatus').textContent='⚠ เชื่อมต่อไม่ได้: '+e.message+' — ตรวจ firebaseConfig และเปิด Anonymous Auth';
+});
+function enterApp(){
+  OPERATOR=document.getElementById('opName').value.trim();
+  if(!OPERATOR){toast('ใส่ชื่อก่อน');return;}
+  localStorage.setItem('rsu-op',OPERATOR);
+  document.getElementById('gate').style.display='none';
+  document.getElementById('hdrSub').textContent=OPERATOR+' · '+new Date().toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'});
+  setSync(navigator.onLine);
+}
+
+/* realtime listeners */
+function attachListeners(){
+  db.collection('drivers').orderBy('name').onSnapshot(s=>{
+    DRIVERS=s.docs.map(d=>({id:d.id,...d.data()})); renderAll();
+  });
+  db.collection('tx').orderBy('ts','desc').limit(2000).onSnapshot(s=>{
+    TX=s.docs.map(d=>({id:d.id,...d.data()})); renderAll();
+  });
+  db.collection('incidents').orderBy('ts','desc').onSnapshot(s=>{
+    INC=s.docs.map(d=>({id:d.id,...d.data()})); renderInc();
+  });
+  db.doc('meta/settings').onSnapshot(s=>{
+    if(s.exists) SETTINGS={overdueDays:3,...s.data()};
+    document.getElementById('setOverdue').value=SETTINGS.overdueDays;
+    renderAll();
+  });
+}
+
+/* ================= NAV / UI ================= */
+function go(t){
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+t).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  if(t==='dash') renderDash(); window.scrollTo(0,0);
+}
+function openModal(id){document.getElementById(id).classList.add('show');}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function buildQtyGrid(){
+  document.getElementById('qtyGrid').innerHTML=TYPES.map(t=>`
+    <div class="qty-cell"><div class="n">${t.n}</div>
+    <input type="number" inputmode="numeric" min="0" placeholder="0" id="q_${t.c}"></div>`).join('');
+}
+function readQty(){const o={};let tot=0;
+  TYPES.forEach(t=>{const v=parseInt(document.getElementById('q_'+t.c).value)||0;if(v>0){o[t.c]=v;tot+=v;}});
+  return{items:o,total:tot};}
+function clearQty(){TYPES.forEach(t=>document.getElementById('q_'+t.c).value='');
+  document.getElementById('txRQ').value='';document.getElementById('txNote').value='';
+  aiSource=false;document.getElementById('aiSrcNote').style.display='none';}
+function setDir(d){curDir=d;
+  document.querySelectorAll('#dirSeg button').forEach(b=>b.classList.toggle('on',b.dataset.d===d));}
+
+/* ================= TX ================= */
+async function saveTx(){
+  const drv=document.getElementById('txDriver').value;
+  if(!drv){toast('เพิ่มคนขับก่อน (แท็บ 🚚)');return;}
+  const q=readQty();
+  if(q.total===0){toast('ใส่จำนวนอย่างน้อย 1 รายการ');return;}
+  try{
+    await db.collection('tx').add({
+      ts:Date.now(), driverId:drv, dir:curDir, items:q.items,
+      rq:document.getElementById('txRQ').value.trim(),
+      note:document.getElementById('txNote').value.trim(),
+      src:aiSource?'ai':'manual', by:OPERATOR
+    });
+    clearQty(); toast(curDir==='out'?'⬆ บันทึกจ่ายออกแล้ว':'⬇ บันทึกรับคืนแล้ว');
+  }catch(e){toast('⚠ บันทึกไม่สำเร็จ: '+e.message);}
+}
+const txSummary=i=>Object.entries(i).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ');
+const txTotal=i=>Object.values(i).reduce((a,b)=>a+b,0);
+
+function renderTodayTx(){
+  const el=document.getElementById('todayTx');
+  const d0=new Date();d0.setHours(0,0,0,0);
+  const list=TX.filter(t=>t.ts>=d0.getTime()).slice(0,15);
+  if(!list.length){el.innerHTML='<div class="empty"><div class="big">🗂</div>ยังไม่มีรายการวันนี้</div>';return;}
+  el.innerHTML=list.map(t=>{
+    const d=DRIVERS.find(x=>x.id===t.driverId);
+    return `<div class="tx"><div class="dir ${t.dir}">${t.dir==='out'?'⬆':'⬇'}</div>
+      <div><div><b>${d?d.name:'?'}</b> ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'🤖':''}</div>
+      <div class="meta">${txSummary(t.items)} · ${new Date(t.ts).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})} · ${t.by||''}</div></div>
+      <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}</div></div>`;
+  }).join('');
+}
+
+/* ================= WALLET ================= */
+function driverBalance(id){
+  const bal={};TYPES.forEach(t=>bal[t.c]=0);
+  let lastZeroTs=null;
+  const list=TX.filter(t=>t.driverId===id).sort((a,b)=>a.ts-b.ts);
+  for(const t of list){
+    for(const[c,v]of Object.entries(t.items))bal[c]=(bal[c]||0)+(t.dir==='out'?v:-v);
+    const net=Object.values(bal).reduce((a,b)=>a+b,0);
+    if(net<=0)lastZeroTs=t.ts;
+  }
+  const net=Object.values(bal).reduce((a,b)=>a+Math.max(b,0),0);
+  let aging=0;
+  if(net>0){
+    const firstOut=list.find(t=>t.dir==='out');
+    const ref=lastZeroTs??(firstOut?firstOut.ts:Date.now());
+    aging=Math.floor((Date.now()-ref)/86400000);
+  }
+  return{bal,net,aging,locked:net>0&&aging>SETTINGS.overdueDays};
+}
+
+function renderDrivers(){
+  const el=document.getElementById('drvList');
+  const sel=document.getElementById('txDriver');
+  const isel=document.getElementById('iDriver');
+  sel.innerHTML=DRIVERS.length?DRIVERS.map(d=>`<option value="${d.id}">${d.name} · ${d.plate||'-'}</option>`).join(''):'<option value="">— ยังไม่มีคนขับ —</option>';
+  isel.innerHTML='<option value="">ไม่ระบุ</option>'+DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  let locks=0;
+  if(!DRIVERS.length){el.innerHTML='<div class="empty"><div class="big">🚚</div>ยังไม่มีคนขับ — กด ＋ เพิ่มคนขับ</div>';}
+  else{
+    el.innerHTML=DRIVERS.map(d=>{
+      const b=driverBalance(d.id);if(b.locked)locks++;
+      return `<div class="drv" onclick="openDrvDetail('${d.id}')">
+        <div><div class="nm">${d.name} ${b.locked?'<span class="badge lock">🔒 ล็อก</span>':(b.net===0?'<span class="badge ok">เคลียร์</span>':'')}</div>
+        <div class="pl">${d.plate||''} ${d.co?'· '+d.co:''}</div></div>
+        <div class="bal"><div class="n ${b.net>0?'pos':'zero'}">${b.net}</div>
+        <div class="a">${b.net>0?'ค้าง '+b.aging+' วัน':'ไม่มียอดค้าง'}</div></div></div>`;
+    }).join('');
+  }
+  document.getElementById('kDrv').textContent=DRIVERS.length;
+  document.getElementById('kLock').textContent=locks;
+}
+function openDriverModal(){['dNm','dPl','dCo'].forEach(i=>document.getElementById(i).value='');openModal('mDriver');}
+async function addDriver(){
+  const nm=document.getElementById('dNm').value.trim();
+  if(!nm){toast('ใส่ชื่อคนขับ');return;}
+  try{
+    await db.collection('drivers').add({name:nm,
+      plate:document.getElementById('dPl').value.trim(),
+      co:document.getElementById('dCo').value.trim(), createdAt:Date.now()});
+    closeModal('mDriver');toast('เพิ่มคนขับแล้ว');
+  }catch(e){toast('⚠ '+e.message);}
+}
+function openDrvDetail(id){
+  curDrvId=id;
+  const d=DRIVERS.find(x=>x.id===id);const b=driverBalance(id);
+  document.getElementById('ddName').textContent=d.name;
+  document.getElementById('ddMeta').textContent=(d.plate||'')+(d.co?' · '+d.co:'');
+  document.getElementById('ddBal').innerHTML=
+    `<div class="kpi" style="background:${b.net>0?'#5C1A1D':'var(--navy)'}"><div class="edge" style="background:${b.net>0?'var(--red)':'var(--green)'}"></div>
+     <div class="v">${b.net}</div><div class="l">ยอดค้างรวม ${b.net>0?'· ค้างมา '+b.aging+' วัน'+(b.locked?' · 🔒 เกินกำหนด — ระงับจ่ายเพิ่ม':''):''}</div></div>`
+    +(b.net>0?`<div class="hint">แยกชนิด: ${Object.entries(b.bal).filter(([,v])=>v>0).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ')}</div>`:'');
+  const list=TX.filter(t=>t.driverId===id);
+  document.getElementById('ddTx').innerHTML=list.length?list.map(t=>`
+    <div class="tx"><div class="dir ${t.dir}">${t.dir==='out'?'⬆':'⬇'}</div>
+    <div><div>${t.rq||'(ไม่มี RQ)'} ${t.src==='ai'?'🤖':''}</div>
+    <div class="meta">${txSummary(t.items)} · ${new Date(t.ts).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${t.by||''}</div></div>
+    <div class="amt">${t.dir==='out'?'-':'+'}${txTotal(t.items)}</div></div>`).join(''):
+    '<div class="empty">ยังไม่มีรายการ</div>';
+  openModal('mDrvDetail');
+}
+async function delDriver(){
+  if(!confirm('ลบคนขับและประวัติทั้งหมดของคนนี้?'))return;
+  try{
+    const txs=await db.collection('tx').where('driverId','==',curDrvId).get();
+    const batch=db.batch();
+    txs.forEach(d=>batch.delete(d.ref));
+    batch.delete(db.collection('drivers').doc(curDrvId));
+    await batch.commit();
+    closeModal('mDrvDetail');toast('ลบแล้ว');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+/* ================= INCIDENTS ================= */
+function openIncModal(){document.getElementById('iBranch').value='';document.getElementById('iDetail').value='';openModal('mInc');}
+async function addInc(){
+  try{
+    await db.collection('incidents').add({
+      ts:Date.now(), type:document.getElementById('iType').value,
+      driverId:document.getElementById('iDriver').value||null,
+      branch:document.getElementById('iBranch').value.trim(),
+      detail:document.getElementById('iDetail').value.trim(),
+      status:'open', by:OPERATOR});
+    closeModal('mInc');toast('เปิดเคสแล้ว');
+  }catch(e){toast('⚠ '+e.message);}
+}
+async function toggleInc(id){
+  const i=INC.find(x=>x.id===id);
+  await db.collection('incidents').doc(id).update({status:i.status==='open'?'closed':'open'});
+}
+function renderInc(){
+  const el=document.getElementById('incList');
+  const m0=new Date();m0.setDate(1);m0.setHours(0,0,0,0);
+  document.getElementById('kIncM').textContent=INC.filter(i=>i.ts>=m0.getTime()).length;
+  document.getElementById('kIncOpen').textContent=INC.filter(i=>i.status==='open').length;
+  if(!INC.length){el.innerHTML='<div class="empty"><div class="big">✅</div>ไม่มีเคส — เป้าหมายคือให้เป็นแบบนี้ทุกเดือน</div>';return;}
+  el.innerHTML=INC.map(i=>{
+    const d=i.driverId?DRIVERS.find(x=>x.id===i.driverId):null;
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <b style="font-size:14px">${i.type}</b>
+        <span class="badge ${i.status}">${i.status==='open'?'เปิดอยู่':'ปิดแล้ว'}</span>
+        <button class="btn ${i.status==='open'?'btn-navy':'btn-ghost'} btn-sm" style="margin-left:auto" onclick="toggleInc('${i.id}')">${i.status==='open'?'ปิดเคส':'เปิดใหม่'}</button>
+      </div>
+      <div class="hint">${i.branch?'ต้นทาง: '+i.branch+' · ':''}${d?'คนขับ: '+d.name+' · ':''}${new Date(i.ts).toLocaleDateString('th-TH',{day:'numeric',month:'short'})} ${i.by?'· โดย '+i.by:''}</div>
+      ${i.detail?`<div style="font-size:13.5px;margin-top:6px">${i.detail}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ================= DASHBOARD ================= */
+function renderDash(){
+  let out=0;const byT={};
+  DRIVERS.forEach(d=>{const b=driverBalance(d.id);
+    Object.entries(b.bal).forEach(([c,v])=>{if(v>0){byT[c]=(byT[c]||0)+v;out+=v;}});});
+  document.getElementById('kOut').textContent=out;
+  const d0=new Date();d0.setHours(0,0,0,0);
+  document.getElementById('kTxToday').textContent=TX.filter(t=>t.ts>=d0.getTime()).length;
+
+  const days=[],outs=[],ins=[];
+  for(let i=6;i>=0;i--){
+    const s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-i);
+    const e=new Date(s);e.setDate(e.getDate()+1);
+    days.push(s.toLocaleDateString('th-TH',{weekday:'short'}));
+    let o=0,n=0;
+    TX.forEach(t=>{if(t.ts>=s.getTime()&&t.ts<e.getTime()){const v=txTotal(t.items);if(t.dir==='out')o+=v;else n+=v;}});
+    outs.push(o);ins.push(n);
+  }
+  if(chart7)chart7.destroy();
+  chart7=new Chart(document.getElementById('chart7'),{type:'bar',
+    data:{labels:days,datasets:[
+      {label:'จ่ายออก',data:outs,backgroundColor:'#E5484D',borderRadius:5},
+      {label:'รับคืน',data:ins,backgroundColor:'#30A46C',borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{family:"'IBM Plex Sans Thai',sans-serif"}}}},
+      scales:{y:{beginAtZero:true}}}});
+
+  const rows=DRIVERS.map(d=>({d,b:driverBalance(d.id)})).filter(r=>r.b.net>0)
+    .sort((a,b)=>b.b.net-a.b.net).slice(0,5);
+  document.getElementById('topDebt').innerHTML=rows.length?
+    '<table class="rp"><tr><th>คนขับ</th><th style="text-align:right">ค้าง</th><th style="text-align:right">วัน</th></tr>'+
+    rows.map(r=>`<tr><td>${r.d.name}${r.b.locked?' 🔒':''}</td><td style="text-align:right;font-weight:700">${r.b.net}</td><td style="text-align:right">${r.b.aging}</td></tr>`).join('')+'</table>'
+    :'<div class="empty">ไม่มียอดค้าง 🎉</div>';
+
+  document.getElementById('byType').innerHTML=Object.keys(byT).length?
+    '<table class="rp"><tr><th>ชนิด</th><th style="text-align:right">ค้าง (หน่วย)</th></tr>'+
+    Object.entries(byT).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);
+      return `<tr><td>${t?t.n:c}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`}).join('')+'</table>'
+    :'<div class="empty">ไม่มียอดค้าง</div>';
+}
+
+/* ================= AI COUNT ================= */
+document.getElementById('camInput').addEventListener('change',async ev=>{
+  const file=ev.target.files[0];if(!file)return;
+  if(!AI_ENDPOINT){toast('ยังไม่ได้ตั้งค่า AI_ENDPOINT — กรอกตัวเลขเองได้เลย');ev.target.value='';return;}
+  const img=new Image();
+  img.onload=async()=>{
+    const cv=document.createElement('canvas');
+    const scale=Math.min(1,1200/Math.max(img.width,img.height));
+    cv.width=Math.round(img.width*scale);cv.height=Math.round(img.height*scale);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    const dataUrl=cv.toDataURL('image/jpeg',0.82);
+    const prev=document.getElementById('aiPreview');prev.src=dataUrl;prev.style.display='block';
+    await runAI(dataUrl.split(',')[1]);
+  };
+  img.src=URL.createObjectURL(file);
+  ev.target.value='';
+});
+async function runAI(b64){
+  const st=document.getElementById('aiStatus');
+  st.style.display='block';
+  document.getElementById('aiStatusTxt').textContent='AI กำลังนับตะกร้าจากภาพ…';
+  try{
+    const resp=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image:b64})});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const j=await resp.json();
+    let filled=0;
+    TYPES.forEach(t=>{const v=j.counts&&j.counts[t.c]?parseInt(j.counts[t.c])||0:0;
+      document.getElementById('q_'+t.c).value=v>0?v:'';if(v>0)filled+=v;});
+    aiSource=true;
+    const note=document.getElementById('aiSrcNote');
+    const confTh=j.confidence==='high'?'มั่นใจสูง':j.confidence==='medium'?'มั่นใจปานกลาง':'มั่นใจต่ำ — นับมือซ้ำ';
+    note.style.display='block';
+    note.textContent=`🤖 AI นับได้ ${filled} หน่วย (${confTh}) — ${j.note||''} ตรวจทานก่อนบันทึก`;
+    st.style.display='none';
+    toast('AI นับเสร็จ — ตรวจทานตัวเลข');
+    document.getElementById('qtyGrid').scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){
+    st.style.display='none';
+    toast('⚠ AI นับไม่สำเร็จ ('+e.message+') — กรอกเองได้เลย');
+  }
+}
+
+/* ================= EXPORT / SETTINGS ================= */
+function exportXLSX(){
+  const wb=XLSX.utils.book_new();
+  const txRows=[['วันที่','เวลา','คนขับ','ทะเบียน','ประเภท','RQ','ที่มา','ผู้บันทึก',...TYPES.map(t=>t.n),'รวม','หมายเหตุ']];
+  [...TX].sort((a,b)=>a.ts-b.ts).forEach(t=>{
+    const d=DRIVERS.find(x=>x.id===t.driverId)||{};
+    const dt=new Date(t.ts);
+    txRows.push([dt.toLocaleDateString('th-TH'),dt.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}),
+      d.name||'?',d.plate||'',t.dir==='out'?'จ่ายออก':'รับคืน',t.rq||'',t.src==='ai'?'AI':'มือ',t.by||'',
+      ...TYPES.map(x=>t.items[x.c]||0),txTotal(t.items),t.note||'']);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(txRows),'รายการเคลื่อนไหว');
+  const balRows=[['คนขับ','ทะเบียน','สังกัด',...TYPES.map(t=>t.n),'ค้างรวม','ค้าง(วัน)','สถานะ']];
+  DRIVERS.forEach(d=>{const b=driverBalance(d.id);
+    balRows.push([d.name,d.plate||'',d.co||'',...TYPES.map(t=>Math.max(b.bal[t.c],0)),b.net,b.net>0?b.aging:0,b.locked?'ล็อก':'ปกติ']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(balRows),'ยอดค้างรายคนขับ');
+  const incRows=[['วันที่','ประเภท','ต้นทาง','คนขับ','รายละเอียด','สถานะ','ผู้เปิดเคส']];
+  INC.forEach(i=>{const d=i.driverId?DRIVERS.find(x=>x.id===i.driverId):null;
+    incRows.push([new Date(i.ts).toLocaleDateString('th-TH'),i.type,i.branch||'',d?d.name:'',i.detail||'',i.status==='open'?'เปิด':'ปิด',i.by||'']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(incRows),'Incident');
+  XLSX.writeFile(wb,'RSU_Asset_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('ดาวน์โหลดไฟล์แล้ว');
+}
+async function saveSettings(){
+  const v=Math.max(1,parseInt(document.getElementById('setOverdue').value)||3);
+  await db.doc('meta/settings').set({overdueDays:v},{merge:true});
+  toast('บันทึกแล้ว — มีผลทุกเครื่องทันที');
+}
+function renderSettings(){
+  document.getElementById('dataInfo').textContent=
+    `คนขับ ${DRIVERS.length} คน · รายการ ${TX.length} รายการ · เคส ${INC.length} เคส · AI: ${AI_ENDPOINT?'พร้อมใช้':'ยังไม่ตั้งค่า'} — ข้อมูลซิงก์ทุกเครื่องแบบเรียลไทม์ และใช้ออฟไลน์ได้ (ซิงก์เมื่อมีเน็ต)`;
+}
+function renderAll(){renderDrivers();renderTodayTx();renderSettings();
+  if(document.getElementById('page-dash').classList.contains('active'))renderDash();}
+buildQtyGrid();
+</script>
+</body>
+</html>
