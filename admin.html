@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0A1628">
+<title>RSU Admin · Control Room</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+/* ⚙️ ใช้ firebaseConfig ชุดเดียวกับ index.html เป๊ะ ๆ */
+const firebaseConfig = {
+  apiKey:            "PASTE_YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "000000000000",
+  appId:             "PASTE_YOUR_APP_ID"
+};
+</script>
+
+<style>
+/* DHL Corporate Identity — dark control room */
+:root{
+  --bg:#161616; --panel:#1F1F1F; --panel2:#2A2A2A; --line:#3B3B3B;
+  --txt:#F2EFE4; --dim:#9C978A; --amber:#FFCC00; --red:#FF4650; --green:#39C77E;
+  --navy:#191919;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Thai','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--txt);font-size:14px;padding-bottom:70px}
+.tape{height:6px;background:repeating-linear-gradient(-45deg,#D40511 0 14px,#FFCC00 14px 28px)}
+header{background:var(--panel);padding:13px 16px;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header .t{font-weight:700;font-size:16px}
+header .t small{display:block;font-size:10.5px;color:var(--amber);letter-spacing:.12em;font-weight:600}
+header .who{margin-left:auto;font-size:11.5px;color:var(--dim);text-align:right}
+header .who a{color:#FF4650;cursor:pointer;text-decoration:none}
+
+.wrap{padding:14px;max-width:1100px;margin:0 auto}
+.tab-page{display:none}.tab-page.active{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--panel);display:flex;z-index:60;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--dim);padding:9px 2px 8px;font-family:inherit;font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button .ic{font-size:19px;line-height:1}
+nav button.on{color:var(--amber)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:13.5px;font-weight:700;margin-bottom:10px;color:var(--txt);display:flex;align-items:center;gap:8px}
+.card h2 .dot{width:8px;height:8px;border-radius:2px;background:var(--amber)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+.kpi .v{font-size:27px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:11px;color:var(--dim);margin-top:2px}
+.kpi .edge{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--amber)}
+.kpi.bad .edge{background:var(--red)} .kpi.bad .v{color:var(--red)}
+.kpi.good .edge{background:var(--green)}
+
+.btn{border:0;border-radius:10px;padding:11px 16px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.btn-amber{background:var(--amber);color:#191919}
+.btn-line{background:transparent;border:1.5px solid var(--line);color:var(--txt)}
+.btn-red{background:var(--red);color:#fff}
+.btn-sm{padding:6px 10px;font-size:12px;border-radius:8px}
+.btn-blk{display:block;width:100%}
+.btn:disabled{opacity:.4}
+
+label.f{display:block;font-size:11.5px;font-weight:600;color:var(--dim);margin:10px 0 4px}
+input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:15px;background:var(--panel2);color:var(--txt)}
+input:focus,select:focus{outline:2px solid var(--amber);border-color:var(--amber)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+table.rp{width:100%;border-collapse:collapse;font-size:12.5px}
+table.rp th{background:var(--panel2);padding:8px;text-align:left;font-weight:600;color:var(--dim);position:sticky;top:0}
+table.rp td{padding:8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;white-space:nowrap}
+.badge.hi{background:#3A1418;color:var(--red)}
+.badge.md{background:#3A2F14;color:var(--amber)}
+.badge.lo{background:#12301F;color:var(--green)}
+.badge.lock{background:#3A1418;color:var(--red)}
+.badge.ai{background:#332B00;color:#FFCC00}
+.chartbox{height:230px}
+.empty{text-align:center;color:var(--dim);padding:24px;font-size:13px}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--amber);color:#191919;padding:10px 20px;border-radius:99px;font-size:13.5px;font-weight:700;z-index:200;display:none;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:18px}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:10px}
+.alert-item{border:1px solid var(--line);border-left:4px solid var(--red);border-radius:10px;padding:11px 13px;margin-bottom:9px;background:var(--panel2)}
+.alert-item.md{border-left-color:var(--amber)}
+.alert-item .h{font-weight:700;font-size:13px;display:flex;gap:8px;align-items:center}
+.alert-item .d{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.5}
+#login{position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px}
+#login .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;width:100%;max-width:400px}
+.hint{font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.55}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.filters select,.filters input{width:auto;flex:1;min-width:130px;font-size:13px;padding:8px 10px}
+</style>
+</head>
+<body>
+
+<!-- ADMIN LOGIN -->
+<div id="login">
+  <div class="box">
+    <div class="tape" style="border-radius:99px;margin-bottom:14px"></div>
+    <h3 style="font-size:18px;font-weight:700">🔐 RSU Admin</h3>
+    <div class="hint">หลังบ้านสำหรับผู้ดูแลระบบเท่านั้น — ล็อกอินด้วยบัญชี Admin ที่สร้างไว้ใน Firebase Authentication</div>
+    <label class="f">อีเมล Admin</label>
+    <input id="lgEmail" type="email" autocomplete="username" placeholder="admin@company.com">
+    <label class="f">รหัสผ่าน</label>
+    <input id="lgPass" type="password" autocomplete="current-password">
+    <div class="hint" id="lgErr" style="color:var(--red)"></div>
+    <div style="margin-top:14px"><button class="btn btn-amber btn-blk" onclick="doLogin()">เข้าสู่ระบบ</button></div>
+  </div>
+</div>
+
+<header>
+  <div class="t" style="font-style:italic">Control Room<small>DHL SUPPLY CHAIN · RSU · ADMIN ONLY</small></div>
+  <div class="who"><span id="whoTxt"></span><br><a onclick="doLogout()">ออกจากระบบ</a></div>
+</header>
+<div class="tape"></div>
+
+<!-- ============ OVERVIEW ============ -->
+<div class="wrap tab-page active" id="page-over">
+  <div class="kpis">
+    <div class="kpi"><div class="edge"></div><div class="v" id="oOut">0</div><div class="l">ค้างนอกดีซี (หน่วย)</div></div>
+    <div class="kpi bad"><div class="edge"></div><div class="v" id="oLock">0</div><div class="l">คนขับติดล็อก</div></div>
+    <div class="kpi bad"><div class="edge"></div><div class="v" id="oAlert">0</div><div class="l">สัญญาณผิดปกติ</div></div>
+    <div class="kpi"><div class="edge"></div><div class="v" id="oTxT">0</div><div class="l">รายการวันนี้</div></div>
+    <div class="kpi"><div class="edge"></div><div class="v" id="oIncM">0</div><div class="l">Incident เดือนนี้</div></div>
+    <div class="kpi good"><div class="edge"></div><div class="v" id="oPhoto">0%</div><div class="l">รายการมีภาพหลักฐาน (7 วัน)</div></div>
+  </div>
+  <div class="card"><h2><span class="dot"></span>จ่ายออก vs รับคืน — 14 วัน</h2><div class="chartbox"><canvas id="chA"></canvas></div></div>
+  <div class="row2">
+    <div class="card"><h2><span class="dot"></span>ยอดค้างสูงสุด</h2><div id="oDebt"></div></div>
+    <div class="card"><h2><span class="dot"></span>ความเคลื่อนไหวรายชนิด (ค้าง)</h2><div id="oType"></div></div>
+  </div>
+</div>
+
+<!-- ============ ACTIVITY ============ -->
+<div class="wrap tab-page" id="page-act">
+  <div class="card">
+    <h2><span class="dot"></span>ผู้ปฏิบัติงาน (Operator)</h2>
+    <div id="opStats"></div>
+    <div class="hint">นับจากชื่อที่พนักงานใส่ตอนเข้าแอป — ถ้าเห็นชื่อแปลกที่ไม่ใช่คนในทีม ให้ตรวจสอบทันที</div>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>Feed กิจกรรมทั้งหมด</h2>
+    <div class="filters">
+      <select id="fOp"><option value="">ทุก Operator</option></select>
+      <select id="fDrv"><option value="">ทุกคนขับ</option></select>
+      <select id="fDir"><option value="">ทุกประเภท</option><option value="out">จ่ายออก</option><option value="in">รับคืน</option></select>
+      <input type="date" id="fDate">
+      <button class="btn btn-line btn-sm" onclick="renderFeed()">กรอง</button>
+      <button class="btn btn-line btn-sm" onclick="clearFilter()">ล้าง</button>
+    </div>
+    <div class="scroll"><table class="rp" id="feedTbl"></table></div>
+  </div>
+</div>
+
+<!-- ============ DRIVERS (FULL CRUD) ============ -->
+<div class="wrap tab-page" id="page-drv">
+  <div class="row2" style="margin-bottom:12px">
+    <button class="btn btn-amber" onclick="openDrvEdit(null)">＋ เพิ่มคนขับ</button>
+    <button class="btn btn-line" onclick="printQRCards()">🖨 พิมพ์บัตร QR คนขับ</button>
+  </div>
+  <div class="card">
+    <div class="scroll"><table class="rp" id="drvTbl"></table></div>
+    <div class="hint">Admin แก้ไข/ลบคนขับได้เต็มรูปแบบ — พนักงานหน้างานเพิ่มได้อย่างเดียว แก้/ลบไม่ได้ (Rules บังคับ)</div>
+  </div>
+</div>
+
+<!-- ============ FRAUD DETECTION ============ -->
+<div class="wrap tab-page" id="page-fraud">
+  <div class="card">
+    <h2><span class="dot"></span>เครื่องตรวจจับความผิดปกติ</h2>
+    <div class="hint" style="margin-bottom:10px">วิเคราะห์จากข้อมูลทั้งหมดอัตโนมัติ — สัญญาณเหล่านี้คือ "จุดให้ไปตรวจ" ไม่ใช่คำตัดสิน ต้องสอบข้อเท็จจริงก่อนกล่าวหาใครเสมอ</div>
+    <button class="btn btn-line btn-blk" onclick="runFraud()">🔍 สแกนใหม่เดี๋ยวนี้</button>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>คะแนนความเสี่ยงรายคนขับ</h2>
+    <div id="riskTbl"></div>
+    <div class="hint">คำนวณจากสัญญาณที่เกี่ยวข้องกับคนขับแต่ละคน (ตรวจด่วน = 3 คะแนน, น่าสังเกต = 1) — ใช้จัดลำดับว่าควรไปตรวจใครก่อน ไม่ใช่บทลงโทษ</div>
+  </div>
+  <div id="fraudList"></div>
+</div>
+
+<!-- ============ REPORTS ============ -->
+<div class="wrap tab-page" id="page-rep">
+  <div class="card">
+    <h2><span class="dot"></span>ดึงรายงาน (ที่เดียวจบ)</h2>
+    <label class="f">ช่วงวันที่</label>
+    <div class="row2">
+      <input type="date" id="rFrom">
+      <input type="date" id="rTo">
+    </div>
+    <div style="margin-top:12px" class="row2">
+      <button class="btn btn-amber" onclick="exportFull()">⬇ Excel ฉบับเต็ม (6 ชีต)</button>
+      <button class="btn btn-line" onclick="exportSummary()">⬇ สรุปผู้บริหาร (1 ชีต)</button>
+    </div>
+    <div class="hint">ฉบับเต็ม: รายการเคลื่อนไหว · ยอดค้างรายคนขับ · สรุปราย Operator · สรุปรายวัน · Incident · สัญญาณผิดปกติ — พร้อมเปิดวิเคราะห์ต่อใน Excel/Pivot ได้ทันที</div>
+  </div>
+  <div class="card"><h2><span class="dot"></span>สรุปรายวัน (ช่วงที่เลือก)</h2><div id="repDaily"></div></div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div class="wrap tab-page" id="page-set">
+  <div class="card">
+    <h2><span class="dot"></span>จัดการภาพหลักฐาน (Archive ก่อนลบ)</h2>
+    <label class="f">อายุภาพที่ครบกำหนดเก็บถาวร (วัน)</label>
+    <input type="number" id="sPhotoDays" min="7" value="60">
+    <div style="margin-top:10px"><button class="btn btn-line btn-blk" onclick="scanOldPhotos()">🔎 สแกนภาพที่ครบกำหนด</button></div>
+    <div id="arcInfo" class="hint" style="margin-top:10px"></div>
+    <div class="row2" style="margin-top:10px">
+      <button class="btn btn-amber" id="arcDlBtn" onclick="downloadArchive()" disabled>⬇ 1) ดาวน์โหลด ZIP ลงคอม</button>
+      <button class="btn btn-red" id="arcDelBtn" onclick="deleteArchived()" disabled>🗑 2) ลบออกจากระบบ</button>
+    </div>
+    <div class="hint">ขั้นตอนบังคับ: ต้องดาวน์โหลด ZIP สำเร็จก่อน ปุ่มลบจึงจะเปิด — ไฟล์ในZIP ตั้งชื่อละเอียด (วันที่_เวลา_คนขับ_ทะเบียน_ประเภท_RQ) พร้อม manifest.csv สรุปทุกรูป เก็บ ZIP ไว้ในโฟลเดอร์หลักฐานของดีซีก่อนกดลบเสมอ</div>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>ตั้งค่าระบบ (มีผลทุกเครื่องทันที)</h2>
+    <label class="f">ค้างเกินกี่วันจึงติดล็อก</label>
+    <input type="number" id="sOver" min="1">
+    <label class="f">เกณฑ์รับคืนไม่มี RQ ที่ถือว่าผิดปกติ (หน่วย/รายการ)</label>
+    <input type="number" id="sNoRQ" min="1">
+    <label class="f">ช่วงเวลาห้ามมีรายการ (นอกเวลางาน) เริ่ม–สิ้นสุด (ชั่วโมง 0–23)</label>
+    <div class="row2"><input type="number" id="sQh1" min="0" max="23"><input type="number" id="sQh2" min="0" max="23"></div>
+    <div style="margin-top:12px"><button class="btn btn-amber btn-blk" onclick="saveSet()">บันทึกการตั้งค่า</button></div>
+  </div>
+  <div class="card">
+    <h2><span class="dot"></span>สถานะระบบ</h2>
+    <div class="hint" id="sysInfo"></div>
+  </div>
+</div>
+
+<nav>
+  <button class="on" data-t="over" onclick="go('over')"><span class="ic">🗼</span>ภาพรวม</button>
+  <button data-t="act" onclick="go('act')"><span class="ic">👣</span>กิจกรรม</button>
+  <button data-t="drv" onclick="go('drv')"><span class="ic">🚚</span>คนขับ</button>
+  <button data-t="fraud" onclick="go('fraud')"><span class="ic">🚨</span>ตรวจจับ</button>
+  <button data-t="rep" onclick="go('rep')"><span class="ic">📑</span>รายงาน</button>
+  <button data-t="set" onclick="go('set')"><span class="ic">⚙️</span>ตั้งค่า</button>
+</nav>
+
+<!-- modal: driver edit -->
+<div class="modal-bg" id="mDrvE"><div class="modal">
+  <h3 id="deTitle">แก้ไขคนขับ</h3>
+  <label class="f">ชื่อ-สกุล</label><input id="deNm">
+  <label class="f">ทะเบียนรถ</label><input id="dePl">
+  <label class="f">สังกัด</label><input id="deCo">
+  <div class="row2" style="margin-top:14px">
+    <button class="btn btn-line" onclick="closeModal('mDrvE')">ยกเลิก</button>
+    <button class="btn btn-amber" onclick="saveDrvEdit()">บันทึก</button>
+  </div>
+  <div id="deDanger" style="margin-top:10px"></div>
+</div></div>
+
+<!-- modal: photo -->
+<div class="modal-bg" id="mPhoto"><div class="modal">
+  <h3>ภาพหลักฐาน</h3>
+  <img id="pvImg" style="width:100%;border-radius:10px;margin:8px 0">
+  <div class="row2">
+    <a id="pvDl" class="btn btn-line" style="text-align:center;text-decoration:none">⬇ บันทึกลงเครื่อง</a>
+    <button class="btn btn-amber" onclick="closeModal('mPhoto')">ปิด</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TYPES=[
+  {c:'A',n:'ตะกร้า A'},{c:'S',n:'ตะกร้า S'},{c:'M',n:'ตะกร้า M'},{c:'SB',n:'ตะกร้า SB'},
+  {c:'PALLET',n:'พาเลท'},{c:'ROLL',n:'Roll cage'},{c:'THERMO',n:'ตู้เทอร์โม'},{c:'PLATE',n:'แผ่นแช่'}
+];
+let DRIVERS=[],TX=[],INC=[],SETTINGS={overdueDays:3,noRqLimit:50,quietFrom:0,quietTo:4};
+let chA=null,editDrvId=null,ALERTS=[];
+
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);};
+
+/* ---------- AUTH: email/password admin only ---------- */
+firebase.auth().onAuthStateChanged(u=>{
+  if(u && !u.isAnonymous){
+    document.getElementById('login').style.display='none';
+    document.getElementById('whoTxt').textContent=u.email;
+    attach();
+  }else{
+    document.getElementById('login').style.display='flex';
+  }
+});
+async function doLogin(){
+  const err=document.getElementById('lgErr');err.textContent='';
+  try{
+    await firebase.auth().signInWithEmailAndPassword(
+      document.getElementById('lgEmail').value.trim(),
+      document.getElementById('lgPass').value);
+  }catch(e){err.textContent='เข้าสู่ระบบไม่สำเร็จ: '+(e.code==='auth/invalid-credential'?'อีเมลหรือรหัสผ่านไม่ถูกต้อง':e.message);}
+}
+function doLogout(){firebase.auth().signOut();location.reload();}
+
+/* ---------- LIVE DATA ---------- */
+let attached=false;
+function attach(){
+  if(attached)return;attached=true;
+  db.collection('drivers').orderBy('name').onSnapshot(s=>{DRIVERS=s.docs.map(d=>({id:d.id,...d.data()}));renderCur();});
+  db.collection('tx').orderBy('ts','desc').limit(5000).onSnapshot(s=>{TX=s.docs.map(d=>({id:d.id,...d.data()}));renderCur();});
+  db.collection('incidents').orderBy('ts','desc').onSnapshot(s=>{INC=s.docs.map(d=>({id:d.id,...d.data()}));renderCur();});
+  db.doc('meta/settings').onSnapshot(s=>{if(s.exists)SETTINGS={...SETTINGS,...s.data()};fillSet();renderCur();});
+  // default report range = this month
+  const now=new Date();
+  document.getElementById('rFrom').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  document.getElementById('rTo').value=now.toISOString().slice(0,10);
+}
+function go(t){
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+t).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  renderCur();window.scrollTo(0,0);
+}
+function curTab(){const b=document.querySelector('nav button.on');return b?b.dataset.t:'over';}
+function renderCur(){
+  const t=curTab();
+  if(t==='over')renderOver();
+  else if(t==='act')renderAct();
+  else if(t==='drv')renderDrvTbl();
+  else if(t==='fraud')runFraud(true);
+  else if(t==='rep')renderDaily();
+  document.getElementById('sysInfo').textContent=
+    `คนขับ ${DRIVERS.length} · รายการ ${TX.length} · Incident ${INC.length} · โหลดล่าสุด ${new Date().toLocaleTimeString('th-TH')}`;
+}
+function openModal(id){document.getElementById(id).classList.add('show');}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+/* ---------- shared helpers ---------- */
+const txTotal=i=>Object.values(i||{}).reduce((a,b)=>a+b,0);
+const txSummary=i=>Object.entries(i||{}).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} ${v}`}).join(' · ');
+const drvName=id=>{const d=DRIVERS.find(x=>x.id===id);return d?d.name:'(ถูกลบ)';};
+function driverBalance(id){
+  const bal={};TYPES.forEach(t=>bal[t.c]=0);
+  let lastZeroTs=null;
+  const list=TX.filter(t=>t.driverId===id).sort((a,b)=>a.ts-b.ts);
+  for(const t of list){
+    for(const[c,v]of Object.entries(t.items||{}))bal[c]=(bal[c]||0)+(t.dir==='out'?v:-v);
+    const net=Object.values(bal).reduce((a,b)=>a+b,0);
+    if(net<=0)lastZeroTs=t.ts;
+  }
+  const net=Object.values(bal).reduce((a,b)=>a+Math.max(b,0),0);
+  let aging=0;
+  if(net>0){
+    const firstOut=list.find(t=>t.dir==='out');
+    aging=Math.floor((Date.now()-(lastZeroTs??(firstOut?firstOut.ts:Date.now())))/86400000);
+  }
+  return{bal,net,aging,locked:net>0&&aging>SETTINGS.overdueDays};
+}
+async function viewPhoto(txId){
+  try{
+    const s=await db.collection('photos').doc(txId).get();
+    if(!s.exists){toast('ภาพถูกเก็บถาวรลงเครื่อง Admin แล้ว (📦 ดูใน ZIP Archive)');return;}
+    document.getElementById('pvImg').src=s.data().data;
+    document.getElementById('pvDl').href=s.data().data;
+    document.getElementById('pvDl').download='evidence_'+txId+'.jpg';
+    openModal('mPhoto');
+  }catch(e){toast('โหลดภาพไม่ได้');}
+}
+
+/* ---------- OVERVIEW ---------- */
+function renderOver(){
+  let out=0,locks=0;const byT={};
+  DRIVERS.forEach(d=>{const b=driverBalance(d.id);if(b.locked)locks++;
+    Object.entries(b.bal).forEach(([c,v])=>{if(v>0){byT[c]=(byT[c]||0)+v;out+=v;}});});
+  document.getElementById('oOut').textContent=out;
+  document.getElementById('oLock').textContent=locks;
+  const d0=new Date();d0.setHours(0,0,0,0);
+  document.getElementById('oTxT').textContent=TX.filter(t=>t.ts>=d0.getTime()).length;
+  const m0=new Date();m0.setDate(1);m0.setHours(0,0,0,0);
+  document.getElementById('oIncM').textContent=INC.filter(i=>i.ts>=m0.getTime()).length;
+  const w7=Date.now()-7*86400000;
+  const recent=TX.filter(t=>t.ts>=w7);
+  document.getElementById('oPhoto').textContent=recent.length?Math.round(100*recent.filter(t=>t.hasPhoto).length/recent.length)+'%':'—';
+  runFraud(true);
+  document.getElementById('oAlert').textContent=ALERTS.length;
+
+  const days=[],outs=[],ins=[];
+  for(let i=13;i>=0;i--){
+    const s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-i);
+    const e=new Date(s);e.setDate(e.getDate()+1);
+    days.push(s.toLocaleDateString('th-TH',{day:'numeric',month:'short'}));
+    let o=0,n=0;
+    TX.forEach(t=>{if(t.ts>=s.getTime()&&t.ts<e.getTime()){const v=txTotal(t.items);if(t.dir==='out')o+=v;else n+=v;}});
+    outs.push(o);ins.push(n);
+  }
+  if(chA)chA.destroy();
+  chA=new Chart(document.getElementById('chA'),{type:'bar',
+    data:{labels:days,datasets:[
+      {label:'จ่ายออก',data:outs,backgroundColor:'#FF5C61',borderRadius:4},
+      {label:'รับคืน',data:ins,backgroundColor:'#3DD68C',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#E7ECF5',font:{family:"'IBM Plex Sans Thai',sans-serif"}}}},
+      scales:{x:{ticks:{color:'#8FA0BE'},grid:{color:'#243756'}},
+              y:{beginAtZero:true,ticks:{color:'#8FA0BE'},grid:{color:'#243756'}}}}});
+
+  const rows=DRIVERS.map(d=>({d,b:driverBalance(d.id)})).filter(r=>r.b.net>0).sort((a,b)=>b.b.net-a.b.net).slice(0,7);
+  document.getElementById('oDebt').innerHTML=rows.length?
+    '<table class="rp"><tr><th>คนขับ</th><th style="text-align:right">ค้าง</th><th style="text-align:right">วัน</th></tr>'+
+    rows.map(r=>`<tr><td>${r.d.name}${r.b.locked?' 🔒':''}</td><td style="text-align:right;font-weight:700">${r.b.net}</td><td style="text-align:right">${r.b.aging}</td></tr>`).join('')+'</table>'
+    :'<div class="empty">ไม่มียอดค้าง</div>';
+  document.getElementById('oType').innerHTML=Object.keys(byT).length?
+    '<table class="rp"><tr><th>ชนิด</th><th style="text-align:right">ค้าง</th></tr>'+
+    Object.entries(byT).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{const t=TYPES.find(x=>x.c===c);
+      return `<tr><td>${t?t.n:c}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`}).join('')+'</table>'
+    :'<div class="empty">ไม่มียอดค้าง</div>';
+}
+
+/* ---------- ACTIVITY ---------- */
+function renderAct(){
+  // operator stats
+  const ops={};
+  TX.forEach(t=>{const k=t.by||'(ไม่ระบุ)';
+    ops[k]=ops[k]||{n:0,out:0,inn:0,last:0,photo:0,ai:0,override:0};
+    ops[k].n++;ops[k][t.dir==='out'?'out':'inn']+=txTotal(t.items);
+    if(t.hasPhoto)ops[k].photo++;if(t.src==='ai')ops[k].ai++;if(t.lockOverride)ops[k].override++;
+    ops[k].last=Math.max(ops[k].last,t.ts);});
+  document.getElementById('opStats').innerHTML=Object.keys(ops).length?
+    '<div class="scroll" style="max-height:260px"><table class="rp"><tr><th>Operator</th><th>รายการ</th><th>จ่าย</th><th>รับ</th><th>📷%</th><th>⚠override</th><th>ล่าสุด</th></tr>'+
+    Object.entries(ops).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>
+      `<tr><td><b>${k}</b></td><td>${o.n}</td><td>${o.out}</td><td>${o.inn}</td>
+       <td>${Math.round(100*o.photo/o.n)}%</td><td>${o.override||''}</td>
+       <td>${new Date(o.last).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td></tr>`).join('')+'</table></div>'
+    :'<div class="empty">ยังไม่มีกิจกรรม</div>';
+  // filter dropdowns
+  const fo=document.getElementById('fOp');const cur=fo.value;
+  fo.innerHTML='<option value="">ทุก Operator</option>'+Object.keys(ops).map(k=>`<option ${k===cur?'selected':''}>${k}</option>`).join('');
+  const fd=document.getElementById('fDrv');const curD=fd.value;
+  fd.innerHTML='<option value="">ทุกคนขับ</option>'+DRIVERS.map(d=>`<option value="${d.id}" ${d.id===curD?'selected':''}>${d.name}</option>`).join('');
+  renderFeed();
+}
+function clearFilter(){['fOp','fDrv','fDir','fDate'].forEach(i=>document.getElementById(i).value='');renderFeed();}
+function renderFeed(){
+  const op=document.getElementById('fOp').value, dv=document.getElementById('fDrv').value,
+        di=document.getElementById('fDir').value, dt=document.getElementById('fDate').value;
+  let list=TX;
+  if(op)list=list.filter(t=>(t.by||'(ไม่ระบุ)')===op);
+  if(dv)list=list.filter(t=>t.driverId===dv);
+  if(di)list=list.filter(t=>t.dir===di);
+  if(dt){const s=new Date(dt).setHours(0,0,0,0),e=s+86400000;list=list.filter(t=>t.ts>=s&&t.ts<e);}
+  document.getElementById('feedTbl').innerHTML=
+    '<tr><th>เวลา</th><th>Operator</th><th>คนขับ</th><th>ทิศ</th><th>รายละเอียด</th><th>รวม</th><th></th></tr>'+
+    (list.slice(0,300).map(t=>`<tr>
+      <td>${new Date(t.ts).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${t.by||''}</td><td>${drvName(t.driverId)}</td>
+      <td style="color:${t.dir==='out'?'var(--red)':'var(--green)'};font-weight:700">${t.dir==='out'?'จ่าย':'รับ'}</td>
+      <td>${txSummary(t.items)} ${t.rq?'· '+t.rq:''} ${t.src==='ai'?'<span class="badge ai">AI</span>':''} ${t.lockOverride?'<span class="badge hi">⚠ จ่ายทั้งที่ล็อก</span>':''}</td>
+      <td style="font-weight:700">${t.dir==='out'?'-':'+'}${txTotal(t.items)}</td>
+      <td>${t.hasPhoto&&!t.photoArchived?`<button class="btn btn-line btn-sm" onclick="viewPhoto('${t.id}')">📷</button>`:(t.photoArchived?'📦':'')}</td></tr>`).join('')
+     ||'<tr><td colspan="7" class="empty">ไม่มีรายการตามเงื่อนไข</td></tr>');
+}
+
+/* ---------- DRIVERS FULL CRUD ---------- */
+function renderDrvTbl(){
+  document.getElementById('drvTbl').innerHTML=
+    '<tr><th>ชื่อ</th><th>ทะเบียน</th><th>สังกัด</th><th style="text-align:right">ค้าง</th><th style="text-align:right">วัน</th><th>สถานะ</th><th></th></tr>'+
+    (DRIVERS.map(d=>{const b=driverBalance(d.id);
+      return `<tr><td><b>${d.name}</b></td><td>${d.plate||''}</td><td>${d.co||''}</td>
+        <td style="text-align:right;font-weight:700;color:${b.net>0?'var(--red)':'var(--green)'}">${b.net}</td>
+        <td style="text-align:right">${b.net>0?b.aging:''}</td>
+        <td>${b.locked?'<span class="badge lock">🔒 ล็อก</span>':''}</td>
+        <td><button class="btn btn-line btn-sm" onclick="openDrvEdit('${d.id}')">แก้ไข</button></td></tr>`;}).join('')
+     ||'<tr><td colspan="7" class="empty">ยังไม่มีคนขับ</td></tr>');
+}
+function openDrvEdit(id){
+  editDrvId=id;
+  const d=id?DRIVERS.find(x=>x.id===id):{name:'',plate:'',co:''};
+  document.getElementById('deTitle').textContent=id?'แก้ไขคนขับ':'เพิ่มคนขับ';
+  document.getElementById('deNm').value=d.name||'';
+  document.getElementById('dePl').value=d.plate||'';
+  document.getElementById('deCo').value=d.co||'';
+  document.getElementById('deDanger').innerHTML=id?
+    `<button class="btn btn-red btn-sm" onclick="adminDelDriver()">🗑 ลบคนขับ + ประวัติทั้งหมด</button>
+     <div class="hint">ลบเฉพาะกรณีเพิ่มผิด — คนขับลาออกแต่มีประวัติ ให้เก็บไว้ ประวัติคือหลักฐาน</div>`:'';
+  openModal('mDrvE');
+}
+async function saveDrvEdit(){
+  const nm=document.getElementById('deNm').value.trim();
+  if(!nm){toast('ใส่ชื่อ');return;}
+  const data={name:nm,plate:document.getElementById('dePl').value.trim(),co:document.getElementById('deCo').value.trim()};
+  try{
+    if(editDrvId)await db.collection('drivers').doc(editDrvId).update(data);
+    else await db.collection('drivers').add({...data,createdAt:Date.now()});
+    closeModal('mDrvE');toast('บันทึกแล้ว');
+  }catch(e){toast('⚠ '+e.message);}
+}
+async function adminDelDriver(){
+  if(!confirm('ลบคนขับและประวัติรายการทั้งหมด? กู้คืนไม่ได้'))return;
+  try{
+    const txs=await db.collection('tx').where('driverId','==',editDrvId).get();
+    const batch=db.batch();
+    txs.forEach(x=>{batch.delete(x.ref);batch.delete(db.collection('photos').doc(x.id));});
+    batch.delete(db.collection('drivers').doc(editDrvId));
+    await batch.commit();
+    closeModal('mDrvE');toast('ลบแล้ว');
+  }catch(e){toast('⚠ '+e.message);}
+}
+
+/* ---------- FRAUD DETECTION ---------- */
+function runFraud(silent){
+  ALERTS=[];
+  const noRq=SETTINGS.noRqLimit||50, q1=SETTINGS.quietFrom??0, q2=SETTINGS.quietTo??4;
+
+  // R1: จ่ายออกทั้งที่คนขับติดล็อก (override)
+  TX.filter(t=>t.lockOverride).forEach(t=>ALERTS.push({sev:'hi',
+    h:'⚠ จ่ายออกให้คนขับที่ติดล็อก',
+    d:`${drvName(t.driverId)} · ${txSummary(t.items)} · โดย ${t.by||'?'} · ${new Date(t.ts).toLocaleString('th-TH')} — ตรวจว่ามีการอนุญาตจากหัวหน้าจริงหรือไม่`}));
+
+  // R2: บันทึกนอกเวลางาน
+  TX.forEach(t=>{const h=new Date(t.ts).getHours();
+    const inQuiet=q1<=q2?(h>=q1&&h<=q2):(h>=q1||h<=q2);
+    if(inQuiet)ALERTS.push({sev:'md',
+      h:'🌙 รายการนอกเวลางาน ('+String(h).padStart(2,'0')+':00)',
+      d:`${t.dir==='out'?'จ่าย':'รับ'} ${txTotal(t.items)} หน่วย · ${drvName(t.driverId)} · โดย ${t.by||'?'} · ${new Date(t.ts).toLocaleString('th-TH')}`});});
+
+  // R3: รับคืนก้อนใหญ่โดยไม่มีเลข RQ
+  TX.filter(t=>t.dir==='in'&&!t.rq&&txTotal(t.items)>=noRq).forEach(t=>ALERTS.push({sev:'md',
+    h:'📄 รับคืนก้อนใหญ่ไม่มีเลข RQ ('+txTotal(t.items)+' หน่วย)',
+    d:`${drvName(t.driverId)} · โดย ${t.by||'?'} · ${new Date(t.ts).toLocaleString('th-TH')} — ของมาจากไหน? ควรมีเอกสารกำกับ`}));
+
+  // R4: ยอดคืนเกินยอดรับ (คืนของที่ไม่เคยเบิก = สวมยอด/ของแปลกปน)
+  DRIVERS.forEach(d=>{
+    const bal={};
+    TX.filter(t=>t.driverId===d.id).sort((a,b)=>a.ts-b.ts).forEach(t=>{
+      Object.entries(t.items||{}).forEach(([c,v])=>bal[c]=(bal[c]||0)+(t.dir==='out'?v:-v));});
+    const negs=Object.entries(bal).filter(([,v])=>v<0);
+    if(negs.length)ALERTS.push({sev:'hi',
+      h:'🔄 '+d.name+' คืนของมากกว่าที่เบิก',
+      d:negs.map(([c,v])=>{const t=TYPES.find(x=>x.c===c);return `${t?t.n:c} เกินมา ${-v}`}).join(' · ')+' — ของส่วนเกินมาจากไหน? อาจเป็นการสวมยอดล้างหนี้ให้คนอื่น หรือบันทึกผิดฝั่ง'});});
+
+  // R5: ล้างยอดพอดีเป๊ะด้วยรายการมือไม่มี RQ ไม่มีรูป
+  DRIVERS.forEach(d=>{
+    const list=TX.filter(t=>t.driverId===d.id).sort((a,b)=>a.ts-b.ts);
+    const bal={};
+    list.forEach((t,i)=>{
+      Object.entries(t.items||{}).forEach(([c,v])=>bal[c]=(bal[c]||0)+(t.dir==='out'?v:-v));
+      const net=Object.values(bal).reduce((a,b)=>a+b,0);
+      if(t.dir==='in'&&net===0&&t.src==='manual'&&!t.rq&&!t.hasPhoto&&txTotal(t.items)>=noRq)
+        ALERTS.push({sev:'hi',
+          h:'🧹 ล้างยอด '+d.name+' พอดีเป๊ะ โดยไม่มีหลักฐานใดเลย',
+          d:`รับคืน ${txTotal(t.items)} หน่วย คีย์มือ ไม่มี RQ ไม่มีรูป · โดย ${t.by||'?'} · ${new Date(t.ts).toLocaleString('th-TH')} — รูปแบบคลาสสิกของการเคลียร์ยอดบนกระดาษ ของจริงไม่ได้กลับมา`});});});
+
+  // R6: operator ปั๊มรายการถี่ผิดปกติ (>5 รายการใน 60 วินาที)
+  const byOp={};
+  TX.forEach(t=>{const k=t.by||'?';(byOp[k]=byOp[k]||[]).push(t.ts);});
+  Object.entries(byOp).forEach(([k,ts])=>{
+    ts.sort((a,b)=>a-b);
+    for(let i=0;i+5<ts.length;i++){
+      if(ts[i+5]-ts[i]<60000){
+        ALERTS.push({sev:'md',h:'⚡ '+k+' บันทึกถี่ผิดปกติ',
+          d:'6+ รายการภายใน 1 นาที ช่วง '+new Date(ts[i]).toLocaleString('th-TH')+' — ของจริงนับทันขนาดนั้นไหม? อาจเป็นการคีย์ย้อนหลังรวบยอด'});
+        break;
+      }
+    }});
+
+  // R7: ยอดค้างเกิน 2 เท่าของเกณฑ์ล็อก (แช่ยาว)
+  DRIVERS.forEach(d=>{const b=driverBalance(d.id);
+    if(b.net>0&&b.aging>SETTINGS.overdueDays*2)ALERTS.push({sev:'hi',
+      h:'⏳ '+d.name+' ค้าง '+b.net+' หน่วย นาน '+b.aging+' วัน',
+      d:'เกินเกณฑ์ล็อก 2 เท่า — ระดับนี้ควรเข้ากระบวนการ Loss/LPS ตาม WI ไม่ใช่รอต่อ'});});
+
+  // dedupe-ish: cap
+  ALERTS=ALERTS.slice(0,120);
+  if(!silent||curTab()==='fraud'){
+    const el=document.getElementById('fraudList');
+    el.innerHTML=ALERTS.length?ALERTS.map(a=>`
+      <div class="alert-item ${a.sev==='md'?'md':''}">
+        <div class="h">${a.h}<span class="badge ${a.sev==='hi'?'hi':'md'}" style="margin-left:auto">${a.sev==='hi'?'ตรวจด่วน':'น่าสังเกต'}</span></div>
+        <div class="d">${a.d}</div></div>`).join('')
+      :'<div class="card"><div class="empty">✅ ไม่พบสัญญาณผิดปกติ — สแกนจากข้อมูล '+TX.length+' รายการ</div></div>';
+  }
+  // คะแนนความเสี่ยงรายคนขับ
+  const risk={};
+  DRIVERS.forEach(d=>risk[d.name]={hi:0,md:0});
+  ALERTS.forEach(al=>{DRIVERS.forEach(d=>{
+    if(al.h.includes(d.name)||al.d.includes(d.name))risk[d.name][al.sev==='hi'?'hi':'md']++;});});
+  const rr=Object.entries(risk).map(([n,r])=>({n,score:r.hi*3+r.md,hi:r.hi,md:r.md}))
+    .filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
+  const rt=document.getElementById('riskTbl');
+  if(rt)rt.innerHTML=rr.length?
+    '<table class="rp"><tr><th>คนขับ</th><th style="text-align:right">คะแนน</th><th style="text-align:right">ตรวจด่วน</th><th style="text-align:right">น่าสังเกต</th><th>ระดับ</th></tr>'+
+    rr.map(r=>`<tr><td><b>${r.n}</b></td><td style="text-align:right;font-weight:700">${r.score}</td>
+      <td style="text-align:right">${r.hi}</td><td style="text-align:right">${r.md}</td>
+      <td><span class="badge ${r.score>=6?'hi':r.score>=3?'md':'lo'}">${r.score>=6?'สูง':r.score>=3?'กลาง':'ต่ำ'}</span></td></tr>`).join('')+'</table>'
+    :'<div class="empty">ไม่มีคนขับที่มีสัญญาณเสี่ยง</div>';
+  if(!silent)toast('สแกนเสร็จ — พบ '+ALERTS.length+' สัญญาณ');
+}
+
+/* ---------- QR DRIVER CARDS ---------- */
+function printQRCards(){
+  if(!DRIVERS.length){toast('ยังไม่มีคนขับ');return;}
+  // สร้าง QR เป็น dataURL ก่อน แล้วเปิดหน้าพิมพ์
+  const holder=document.createElement('div');holder.style.display='none';document.body.appendChild(holder);
+  const cards=DRIVERS.map(d=>{
+    const box=document.createElement('div');holder.appendChild(box);
+    new QRCode(box,{text:d.id,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});
+    const cv=box.querySelector('canvas');
+    return {d,img:cv?cv.toDataURL():''};
+  });
+  holder.remove();
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>บัตร QR คนขับ</title><style>
+    body{font-family:'IBM Plex Sans Thai','Noto Sans Thai',sans-serif;margin:0;padding:10mm;background:#fff}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8mm}
+    .cardq{border:2px solid #191919;border-radius:12px;overflow:hidden;page-break-inside:avoid}
+    .top{background:#FFCC00;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+    .top b{color:#D40511;font-style:italic;font-size:13px}
+    .top span{font-size:10px;color:#191919;font-weight:700}
+    .stripe{height:5px;background:repeating-linear-gradient(-45deg,#D40511 0 10px,#FFCC00 10px 20px)}
+    .bd{display:flex;gap:12px;padding:12px;align-items:center}
+    .bd img{width:110px;height:110px}
+    .nm{font-size:17px;font-weight:800}
+    .pl{font-size:13px;color:#555;margin-top:2px}
+    .co{font-size:11px;color:#888;margin-top:6px}
+    .foot{font-size:9px;color:#999;padding:0 12px 8px}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <button class="noprint" style="margin-bottom:10px;padding:10px 18px;font-weight:700" onclick="window.print()">🖨 พิมพ์</button>
+  <div class="grid">`+cards.map(c=>`
+    <div class="cardq"><div class="top"><b>DHL · RSU DRIVER CARD</b><span>ASSET CONTROL</span></div><div class="stripe"></div>
+    <div class="bd"><img src="${c.img}"><div><div class="nm">${c.d.name}</div><div class="pl">🚚 ${c.d.plate||'-'}</div><div class="co">${c.d.co||''}</div></div></div>
+    <div class="foot">ยื่นบัตรนี้ให้เจ้าหน้าที่สแกนทุกครั้งที่รับ–คืนสินทรัพย์</div></div>`).join('')+`
+  </div></body></html>`);
+  w.document.close();
+}
+
+/* ---------- REPORTS ---------- */
+function repRange(){
+  const f=new Date(document.getElementById('rFrom').value||0).setHours(0,0,0,0);
+  const t=new Date(document.getElementById('rTo').value||Date.now()).setHours(23,59,59,999);
+  return TX.filter(x=>x.ts>=f&&x.ts<=t);
+}
+function renderDaily(){
+  const list=repRange();const days={};
+  list.forEach(t=>{const k=new Date(t.ts).toLocaleDateString('th-TH');
+    days[k]=days[k]||{out:0,inn:0,n:0};days[k].n++;
+    days[k][t.dir==='out'?'out':'inn']+=txTotal(t.items);});
+  document.getElementById('repDaily').innerHTML=Object.keys(days).length?
+    '<div class="scroll" style="max-height:300px"><table class="rp"><tr><th>วันที่</th><th>รายการ</th><th>จ่ายออก</th><th>รับคืน</th><th>สุทธิ</th></tr>'+
+    Object.entries(days).map(([k,v])=>`<tr><td>${k}</td><td>${v.n}</td><td>${v.out}</td><td>${v.inn}</td>
+      <td style="font-weight:700;color:${v.out-v.inn>0?'var(--red)':'var(--green)'}">${v.out-v.inn}</td></tr>`).join('')+'</table></div>'
+    :'<div class="empty">ไม่มีข้อมูลในช่วงนี้</div>';
+}
+function exportFull(){
+  const list=repRange().sort((a,b)=>a.ts-b.ts);
+  const wb=XLSX.utils.book_new();
+  // 1 tx
+  const txR=[['วันที่','เวลา','Operator','คนขับ','ทะเบียน','ทิศทาง','RQ','ที่มา','มีรูป','Override ล็อก',...TYPES.map(t=>t.n),'รวม','หมายเหตุ']];
+  list.forEach(t=>{const d=DRIVERS.find(x=>x.id===t.driverId)||{};const dt=new Date(t.ts);
+    txR.push([dt.toLocaleDateString('th-TH'),dt.toLocaleTimeString('th-TH'),t.by||'',d.name||'(ถูกลบ)',d.plate||'',
+      t.dir==='out'?'จ่ายออก':'รับคืน',t.rq||'',t.src==='ai'?'AI':'มือ',t.hasPhoto?'✔':'',t.lockOverride?'⚠':'',
+      ...TYPES.map(x=>(t.items||{})[x.c]||0),txTotal(t.items),t.note||'']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(txR),'รายการเคลื่อนไหว');
+  // 2 balances
+  const bR=[['คนขับ','ทะเบียน','สังกัด',...TYPES.map(t=>t.n),'ค้างรวม','ค้าง(วัน)','สถานะ']];
+  DRIVERS.forEach(d=>{const b=driverBalance(d.id);
+    bR.push([d.name,d.plate||'',d.co||'',...TYPES.map(t=>Math.max(b.bal[t.c],0)),b.net,b.net>0?b.aging:0,b.locked?'ล็อก':'ปกติ']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(bR),'ยอดค้างรายคนขับ');
+  // 3 by operator
+  const ops={};
+  list.forEach(t=>{const k=t.by||'(ไม่ระบุ)';ops[k]=ops[k]||{n:0,out:0,inn:0,photo:0,ov:0};
+    ops[k].n++;ops[k][t.dir==='out'?'out':'inn']+=txTotal(t.items);
+    if(t.hasPhoto)ops[k].photo++;if(t.lockOverride)ops[k].ov++;});
+  const oR=[['Operator','รายการ','จ่ายออก','รับคืน','มีรูป(%)','Override ล็อก']];
+  Object.entries(ops).forEach(([k,o])=>oR.push([k,o.n,o.out,o.inn,Math.round(100*o.photo/o.n)+'%',o.ov]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(oR),'สรุปราย Operator');
+  // 4 daily
+  const days={};
+  list.forEach(t=>{const k=new Date(t.ts).toLocaleDateString('th-TH');
+    days[k]=days[k]||{n:0,out:0,inn:0};days[k].n++;days[k][t.dir==='out'?'out':'inn']+=txTotal(t.items);});
+  const dR=[['วันที่','รายการ','จ่ายออก','รับคืน','สุทธิ']];
+  Object.entries(days).forEach(([k,v])=>dR.push([k,v.n,v.out,v.inn,v.out-v.inn]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dR),'สรุปรายวัน');
+  // 5 incidents
+  const iR=[['วันที่','ประเภท','ต้นทาง','คนขับ','รายละเอียด','สถานะ','ผู้เปิด']];
+  INC.forEach(i=>iR.push([new Date(i.ts).toLocaleDateString('th-TH'),i.type,i.branch||'',i.driverId?drvName(i.driverId):'',i.detail||'',i.status==='open'?'เปิด':'ปิด',i.by||'']));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(iR),'Incident');
+  // 6 alerts
+  runFraud(true);
+  const aR=[['ระดับ','สัญญาณ','รายละเอียด']];
+  ALERTS.forEach(a=>aR.push([a.sev==='hi'?'ตรวจด่วน':'น่าสังเกต',a.h.replace(/[⚠🌙📄🔄🧹⚡⏳] /,''),a.d]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aR),'สัญญาณผิดปกติ');
+  XLSX.writeFile(wb,'RSU_Admin_Full_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('ดาวน์โหลดรายงานฉบับเต็มแล้ว');
+}
+function exportSummary(){
+  const list=repRange();
+  let out=0,inn=0;list.forEach(t=>{const v=txTotal(t.items);t.dir==='out'?out+=v:inn+=v;});
+  let bal=0,locks=0;DRIVERS.forEach(d=>{const b=driverBalance(d.id);bal+=b.net;if(b.locked)locks++;});
+  runFraud(true);
+  const m0=new Date();m0.setDate(1);m0.setHours(0,0,0,0);
+  const rows=[
+    ['สรุปผู้บริหาร — RSU Asset Control',''],
+    ['ช่วงรายงาน',document.getElementById('rFrom').value+' ถึง '+document.getElementById('rTo').value],
+    ['',''],
+    ['จ่ายออกรวม (หน่วย)',out],['รับคืนรวม (หน่วย)',inn],['สุทธิ (ยังไม่กลับ)',out-inn],
+    ['ยอดค้างสะสมทั้งระบบ',bal],['คนขับติดล็อก',locks],
+    ['Incident เดือนนี้',INC.filter(i=>i.ts>=m0.getTime()).length],
+    ['สัญญาณผิดปกติที่ตรวจพบ',ALERTS.length],
+    ['สัดส่วนรายการมีภาพหลักฐาน',list.length?Math.round(100*list.filter(t=>t.hasPhoto).length/list.length)+'%':'—'],
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'สรุปผู้บริหาร');
+  XLSX.writeFile(wb,'RSU_Executive_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('ดาวน์โหลดสรุปผู้บริหารแล้ว');
+}
+
+/* ---------- PHOTO ARCHIVE (download-then-delete) ---------- */
+let ARC={list:[],zipDone:false};
+const safeName=s=>(s||'').replace(/[\\/:*?"<>|,\s]+/g,'-').replace(/^-+|-+$/g,'');
+function scanOldPhotos(){
+  const days=Math.max(7,parseInt(document.getElementById('sPhotoDays').value)||60);
+  const cutoff=Date.now()-days*86400000;
+  ARC={list:TX.filter(t=>t.hasPhoto&&!t.photoArchived&&t.ts<cutoff).sort((a,b)=>a.ts-b.ts),zipDone:false};
+  const info=document.getElementById('arcInfo');
+  if(!ARC.list.length){
+    info.textContent='ไม่มีภาพที่เก่ากว่า '+days+' วัน — ไม่มีอะไรต้องทำ';
+    document.getElementById('arcDlBtn').disabled=true;
+    document.getElementById('arcDelBtn').disabled=true;
+    return;
+  }
+  const oldest=new Date(ARC.list[0].ts).toLocaleDateString('th-TH');
+  const newest=new Date(ARC.list[ARC.list.length-1].ts).toLocaleDateString('th-TH');
+  info.innerHTML=`พบ <b style="color:var(--amber)">${ARC.list.length} ภาพ</b> ครบกำหนด (ช่วง ${oldest} – ${newest}, ประมาณ ${(ARC.list.length*0.1).toFixed(1)} MB)<br>ขั้นตอน: กดดาวน์โหลด ZIP → ตรวจว่าไฟล์เปิดได้จริง → ค่อยกดลบ`;
+  document.getElementById('arcDlBtn').disabled=false;
+  document.getElementById('arcDelBtn').disabled=true;
+}
+async function downloadArchive(){
+  if(!ARC.list.length)return;
+  const btn=document.getElementById('arcDlBtn');btn.disabled=true;btn.textContent='กำลังรวบรวมภาพ…';
+  try{
+    const zip=new JSZip();
+    const pad=n=>String(n).padStart(2,'0');
+    const manifest=[['ไฟล์','วันที่','เวลา','คนขับ','ทะเบียน','สังกัด','ประเภท','RQ','Operator','จำนวนรวม','รายละเอียด','หมายเหตุ','TxID']];
+    let got=0;
+    for(let i=0;i<ARC.list.length;i++){
+      const t=ARC.list[i];
+      btn.textContent=`กำลังโหลดภาพ ${i+1}/${ARC.list.length}…`;
+      let s;
+      try{s=await db.collection('photos').doc(t.id).get();}catch(e){continue;}
+      if(!s.exists){t._noPhoto=true;continue;}
+      const d=DRIVERS.find(x=>x.id===t.driverId)||{};
+      const dt=new Date(t.ts);
+      const fname=[
+        `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`,
+        `${pad(dt.getHours())}${pad(dt.getMinutes())}`,
+        safeName(d.name)||'ไม่ทราบชื่อ',
+        safeName(d.plate)||'ไม่มีทะเบียน',
+        t.dir==='out'?'จ่ายออก':'รับคืน',
+        safeName(t.rq)||'ไม่มีRQ',
+        t.id
+      ].join('_')+'.jpg';
+      zip.file(fname, s.data().data.split(',')[1], {base64:true});
+      manifest.push([fname,dt.toLocaleDateString('th-TH'),dt.toLocaleTimeString('th-TH'),
+        d.name||'(ถูกลบ)',d.plate||'',d.co||'',t.dir==='out'?'จ่ายออก':'รับคืน',t.rq||'',t.by||'',
+        txTotal(t.items),txSummary(t.items),(t.note||'').replace(/,/g,' '),t.id]);
+      got++;
+    }
+    if(!got){toast('ไม่พบไฟล์ภาพจริงในระบบ');btn.textContent='⬇ 1) ดาวน์โหลด ZIP ลงคอม';return;}
+    zip.file('manifest.csv','\ufeff'+manifest.map(r=>r.join(',')).join('\r\n'));
+    btn.textContent='กำลังบีบอัด ZIP…';
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const today=new Date();
+    a.download=`RSU_PhotoArchive_${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}_${got}ภาพ.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    ARC.zipDone=true;
+    document.getElementById('arcDelBtn').disabled=false;
+    document.getElementById('arcInfo').innerHTML=
+      `✅ ดาวน์โหลด ${got} ภาพ + manifest.csv แล้ว<br><b style="color:var(--red)">ก่อนกดลบ: เปิดไฟล์ ZIP ตรวจว่าภาพเปิดได้จริง และคัดลอกไปเก็บในโฟลเดอร์หลักฐาน/ไดรฟ์สำรองแล้ว</b>`;
+    toast('ดาวน์โหลดสำเร็จ — ตรวจไฟล์ก่อนลบ');
+  }catch(e){toast('⚠ '+e.message);}
+  btn.textContent='⬇ 1) ดาวน์โหลด ZIP ลงคอม';btn.disabled=false;
+}
+async function deleteArchived(){
+  if(!ARC.zipDone){toast('ต้องดาวน์โหลด ZIP ก่อน');return;}
+  if(!confirm('ยืนยันว่าได้เปิดตรวจไฟล์ ZIP และเก็บสำรองเรียบร้อยแล้ว?'))return;
+  if(!confirm('ลบ '+ARC.list.length+' ภาพออกจากระบบถาวร? กู้คืนไม่ได้ — รายการเคลื่อนไหวยังอยู่ครบ ลบเฉพาะภาพ'))return;
+  const btn=document.getElementById('arcDelBtn');btn.disabled=true;
+  try{
+    // Firestore batch จำกัด 500 ops — แบ่งชุดละ 200 (ลบภาพ + ติดธง tx = 2 ops/รายการ)
+    for(let i=0;i<ARC.list.length;i+=200){
+      const chunk=ARC.list.slice(i,i+200);
+      const batch=db.batch();
+      chunk.forEach(t=>{
+        batch.delete(db.collection('photos').doc(t.id));
+        batch.update(db.collection('tx').doc(t.id),{photoArchived:true});
+      });
+      await batch.commit();
+      btn.textContent=`ลบแล้ว ${Math.min(i+200,ARC.list.length)}/${ARC.list.length}…`;
+    }
+    document.getElementById('arcInfo').textContent='✅ ลบ '+ARC.list.length+' ภาพออกจากระบบแล้ว — รายการเคลื่อนไหวยังอยู่ครบ พร้อมธง 📦 ชี้ว่าภาพอยู่ใน Archive';
+    ARC={list:[],zipDone:false};
+    toast('ลบเสร็จสิ้น');
+  }catch(e){toast('⚠ '+e.message+' — ตรวจว่าวาง Rules เวอร์ชันใหม่แล้ว');}
+  btn.textContent='🗑 2) ลบออกจากระบบ';
+}
+
+/* ---------- SETTINGS ---------- */
+function fillSet(){
+  document.getElementById('sOver').value=SETTINGS.overdueDays;
+  document.getElementById('sNoRQ').value=SETTINGS.noRqLimit||50;
+  document.getElementById('sQh1').value=SETTINGS.quietFrom??0;
+  document.getElementById('sQh2').value=SETTINGS.quietTo??4;
+}
+async function saveSet(){
+  try{
+    await db.doc('meta/settings').set({
+      overdueDays:Math.max(1,parseInt(document.getElementById('sOver').value)||3),
+      noRqLimit:Math.max(1,parseInt(document.getElementById('sNoRQ').value)||50),
+      quietFrom:Math.min(23,Math.max(0,parseInt(document.getElementById('sQh1').value)||0)),
+      quietTo:Math.min(23,Math.max(0,parseInt(document.getElementById('sQh2').value)||4)),
+    },{merge:true});
+    toast('บันทึกแล้ว — มีผลทุกเครื่องทันที');
+  }catch(e){toast('⚠ '+e.message+' — ตรวจว่าล็อกอินด้วยบัญชี Admin ที่ใส่ UID ใน Rules แล้ว');}
+}
+</script>
+</body>
+</html>
