@@ -308,10 +308,14 @@ table.rp td{padding:8px;border-bottom:1px solid var(--line);font-variant-numeric
 
 <!-- modal: photo -->
 <div class="modal-bg" id="mPhoto"><div class="modal">
-  <h3>ภาพหลักฐาน</h3>
+  <div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">ภาพหลักฐาน</h3><span class="hint" id="pvCnt" style="margin:0"></span></div>
   <img id="pvImg" style="width:100%;border-radius:10px;margin:8px 0">
+  <div class="row2" style="margin-bottom:8px">
+    <button class="btn btn-line" onclick="pvNav(-1)">◀</button>
+    <button class="btn btn-line" onclick="pvNav(1)">▶</button>
+  </div>
   <div class="row2">
-    <a id="pvDl" class="btn btn-line" style="text-align:center;text-decoration:none">⬇ บันทึกลงเครื่อง</a>
+    <a id="pvDl" class="btn btn-line" style="text-align:center;text-decoration:none">⬇ บันทึกรูปนี้</a>
     <button class="btn btn-amber" onclick="closeModal('mPhoto')">ปิด</button>
   </div>
 </div></div>
@@ -409,16 +413,24 @@ function driverBalance(id){
   }
   return{bal,net,aging,locked:net>0&&aging>SETTINGS.overdueDays};
 }
+let PV={imgs:[],i:0,txId:''};
 async function viewPhoto(txId){
   try{
     const s=await db.collection('photos').doc(txId).get();
     if(!s.exists){toast('ภาพถูกเก็บถาวรลงเครื่อง Admin แล้ว (📦 ดูใน ZIP Archive)');return;}
-    document.getElementById('pvImg').src=s.data().data;
-    document.getElementById('pvDl').href=s.data().data;
-    document.getElementById('pvDl').download='evidence_'+txId+'.jpg';
-    openModal('mPhoto');
+    const d=s.data();
+    PV={imgs:d.items||(d.data?[d.data]:[]),i:0,txId};
+    if(!PV.imgs.length){toast('ไม่มีภาพ');return;}
+    pvShow();openModal('mPhoto');
   }catch(e){toast('โหลดภาพไม่ได้');}
 }
+function pvShow(){
+  document.getElementById('pvImg').src=PV.imgs[PV.i];
+  document.getElementById('pvDl').href=PV.imgs[PV.i];
+  document.getElementById('pvDl').download='evidence_'+PV.txId+'_'+(PV.i+1)+'.jpg';
+  document.getElementById('pvCnt').textContent='รูป '+(PV.i+1)+' / '+PV.imgs.length;
+}
+function pvNav(d){PV.i=Math.max(0,Math.min(PV.imgs.length-1,PV.i+d));pvShow();}
 
 /* ---------- OVERVIEW ---------- */
 function renderOver(){
@@ -917,9 +929,11 @@ async function downloadArchive(){
       let s;
       try{s=await db.collection('photos').doc(t.id).get();}catch(e){continue;}
       if(!s.exists){t._noPhoto=true;continue;}
+      const pdata=s.data();
+      const imgs=pdata.items||(pdata.data?[pdata.data]:[]);
       const d=DRIVERS.find(x=>x.id===t.driverId)||{};
       const dt=new Date(t.ts);
-      const fname=[
+      const base=[
         `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`,
         `${pad(dt.getHours())}${pad(dt.getMinutes())}`,
         safeName(d.name)||'ไม่ทราบชื่อ',
@@ -927,12 +941,15 @@ async function downloadArchive(){
         t.dir==='out'?'จ่ายออก':'รับคืน',
         safeName(t.rq)||'ไม่มีRQ',
         t.id
-      ].join('_')+'.jpg';
-      zip.file(fname, s.data().data.split(',')[1], {base64:true});
-      manifest.push([fname,dt.toLocaleDateString('th-TH'),dt.toLocaleTimeString('th-TH'),
-        d.name||'(ถูกลบ)',d.plate||'',d.co||'',t.dir==='out'?'จ่ายออก':'รับคืน',t.rq||'',t.by||'',
-        txTotal(t.items),txSummary(t.items),(t.note||'').replace(/,/g,' '),t.id]);
-      got++;
+      ].join('_');
+      imgs.forEach((im,ix)=>{
+        const fname=base+(imgs.length>1?'_รูป'+(ix+1):'')+'.jpg';
+        zip.file(fname, im.split(',')[1], {base64:true});
+        manifest.push([fname,dt.toLocaleDateString('th-TH'),dt.toLocaleTimeString('th-TH'),
+          d.name||'(ถูกลบ)',d.plate||'',d.co||'',t.dir==='out'?'จ่ายออก':'รับคืน',t.rq||'',t.by||'',
+          txTotal(t.items),txSummary(t.items),(t.note||'').replace(/,/g,' '),t.id]);
+        got++;
+      });
     }
     if(!got){toast('ไม่พบไฟล์ภาพจริงในระบบ');btn.textContent='⬇ 1) ดาวน์โหลด ZIP ลงคอม';return;}
     zip.file('manifest.csv','\ufeff'+manifest.map(r=>r.join(',')).join('\r\n'));
